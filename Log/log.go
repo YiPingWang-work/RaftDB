@@ -102,7 +102,7 @@ func (l *Logs) GetCommitted() LogKeyType { // 获取最后一笔提交日志Key
 
 func (l *Logs) Append(content Content) { // 幂等的增加日志
 	l.m.Lock()
-	if len(l.contents) == 0 || l.GetLast().Less(content.LogKey) {
+	if len(l.contents) == 0 || l.contents[len(l.contents)-1].LogKey.Less(content.LogKey) {
 		l.contents = append(l.contents, content)
 	}
 	l.m.Unlock()
