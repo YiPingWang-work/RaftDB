@@ -77,17 +77,23 @@ func (l *Logs) Init(committedKeyTerm int, committedKeyIndex int) {
 }
 
 func (l *Logs) GetLast() LogKeyType { // 获取最后一笔日志Key
+	res := LogKeyType{Term: -1, Index: -1}
+	l.m.RLock()
 	if len(l.contents) >= 1 {
-		return l.contents[len(l.contents)-1].LogKey
+		res = l.contents[len(l.contents)-1].LogKey
 	}
-	return LogKeyType{Term: -1, Index: -1}
+	l.m.RUnlock()
+	return res
 }
 
 func (l *Logs) GetSecondLast() LogKeyType { // 获取倒数第二笔日志Key
+	res := LogKeyType{Term: -1, Index: -1}
+	l.m.RLock()
 	if len(l.contents) >= 2 {
-		return l.contents[len(l.contents)-2].LogKey
+		res = l.contents[len(l.contents)-2].LogKey
 	}
-	return LogKeyType{Term: -1, Index: -1}
+	l.m.RUnlock()
+	return res
 }
 
 func (l *Logs) GetCommitted() LogKeyType { // 获取最后一笔提交日志Key
@@ -184,14 +190,14 @@ func (l *Logs) Append(content Content) { // 幂等的增加日志
 //}
 
 func (l *Logs) GetPrevious(key LogKeyType) LogKeyType {
+	res := LogKeyType{Term: -1, Index: -1}
+	l.m.RLock()
 	left, right := 0, len(l.contents)
 	for left <= right {
 		mid := (left + right) / 2
 		if l.contents[mid].LogKey.Equals(key) {
 			if mid >= 1 {
-				return l.contents[mid-1].LogKey
-			} else {
-				break
+				res = l.contents[mid-1].LogKey
 			}
 		} else if l.contents[mid].LogKey.Greater(key) {
 			right = mid - 1
@@ -199,10 +205,12 @@ func (l *Logs) GetPrevious(key LogKeyType) LogKeyType {
 			left = mid + 1
 		}
 	}
-	return LogKeyType{Term: -1, Index: -1}
+	l.m.RUnlock()
+	return res
 }
 
 func (l *Logs) GetNext(key LogKeyType) LogKeyType {
+	l.m.RLock()
 	left, right := 0, len(l.contents)-1
 	for left < right {
 		mid := (left + right) / 2
@@ -212,29 +220,41 @@ func (l *Logs) GetNext(key LogKeyType) LogKeyType {
 			left = mid + 1
 		}
 	}
+	res := LogKeyType{Term: -1, Index: -1}
 	if l.contents[left].LogKey.Greater(key) {
-		return l.contents[left].LogKey
-	} else {
-		return LogKeyType{Term: -1, Index: -1}
+		res = l.contents[left].LogKey
 	}
+	l.m.RUnlock()
+	return res
 }
 
 func (l *Logs) GetContentByKey(key LogKeyType) (LogType, error) { // 通过Key寻找指定日志，找不到返回空
+	var res LogType
+	err := errors.New("error: can not find this log by key")
+	l.m.RLock()
 	left, right := 0, len(l.contents)
 	for left <= right {
 		mid := (left + right) / 2
 		if l.contents[mid].LogKey.Equals(key) {
-			return l.contents[mid].Log, nil
+			err = nil
+			res = l.contents[mid].Log
+			break
 		} else if l.contents[mid].LogKey.Greater(key) {
 			right = mid - 1
 		} else {
 			left = mid + 1
 		}
 	}
-	return "", errors.New("error: can not find this log by key")
+	l.m.RUnlock()
+	if err == nil {
+		return res, nil
+	} else {
+		return "", err
+	}
 }
 
 func (l *Logs) Commit(key LogKeyType) (previousCommitted LogKeyType) { // 提交所有小于等于key的日志，幂等的提交日志
+	l.m.RLock()
 	previousCommitted = l.committedKey
 	left, right := 0, len(l.contents)-1
 	for left < right {
@@ -248,10 +268,12 @@ func (l *Logs) Commit(key LogKeyType) (previousCommitted LogKeyType) { // 提交
 	if !l.contents[left].LogKey.Greater(key) && previousCommitted.Less(l.contents[left].LogKey) {
 		l.committedKey = l.contents[left].LogKey
 	}
+	l.m.RUnlock()
 	return
 }
 
 func (l *Logs) Remove(key LogKeyType) (LogKeyType, error) { // 删除日志直到自己的日志Key不大于key
+	l.m.Lock()
 	errRes, err := LogKeyType{-1, -1}, errors.New("error: remove committed log")
 	left, right := 0, len(l.contents)-1
 	for left < right {
@@ -264,19 +286,22 @@ func (l *Logs) Remove(key LogKeyType) (LogKeyType, error) { // 删除日志直�
 	}
 	if !l.contents[left].LogKey.Greater(key) {
 		if l.committedKey.Greater(l.contents[left].LogKey) {
+			l.m.Unlock()
 			return errRes, err
 		}
 		l.contents = l.contents[0 : left+1]
 	} else {
 		if !l.committedKey.Equals(LogKeyType{-1, -1}) {
+			l.m.Unlock()
 			return errRes, err
 		}
 		l.contents = []Content{}
 	}
+	l.m.Unlock()
 	return l.GetLast(), nil
 }
 
-func (l *Logs) Iterator(key LogKeyType) int { // 根据Key返回迭代器，没找到返回-1
+func (l *Logs) Iterator(key LogKeyType) int { // 根据Key返回迭代器，没找到返回-1，线程不安全
 	left, right := 0, len(l.contents)
 	for left <= right {
 		mid := (left + right) / 2
@@ -295,7 +320,6 @@ func (l *Logs) GetLogsByRange(begin LogKeyType, end LogKeyType) []Content { // �
 	l.m.RLock()
 	beginIter, endIter := l.Iterator(begin), l.Iterator(end)
 	if beginIter == -1 || endIter == -1 || beginIter > endIter {
-		l.m.RUnlock()
 		return []Content{}
 	} else {
 		tmp := make([]Content, endIter-beginIter+1)
