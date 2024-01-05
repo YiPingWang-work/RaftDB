@@ -98,10 +98,10 @@ func (l *Leader) processRequestReply(msg Order.Msg, me *Me) error { // 处理回
 		if msg.LastLogKey.Term != -1 {
 			newLastLogKey = me.logs.GetPrevious(msg.LastLogKey) // 尝试发送上一条
 			log.Printf("Leader: %d refuse my request %v, his logs is not complete, send request %v\n",
-				msg.From, msg.LastLogKey, reply.LastLogKey)
+				msg.From, msg.LastLogKey, newLastLogKey)
 		} else {
-			log.Printf("Leader: %d's log is not complete, but i don't know his step, send request %v\n",
-				msg.From, reply.LastLogKey)
+			log.Printf("Leader: %d's log is not complete, but I don't know his step, send request %v\n",
+				msg.From, newLastLogKey)
 		}
 		if newLastLogKey.Term == -1 { // 没有上一条，不应该不同意，返回错误
 			return errors.New("error: follower disagree first log")

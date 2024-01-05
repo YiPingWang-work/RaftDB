@@ -18,7 +18,7 @@ func TestLogs(t *testing.T) {
 	//log.Printf(logs.ToString())
 	//logs.Remove(LogKeyType{2, 2})
 	log.Printf(logs.ToString())
-	log.Println(logs.GetPrevious2(LogKeyType{4, 3}))
+	log.Println(logs.GetPrevious(LogKeyType{4, 3}))
 	//logs.Append(Content{LogKeyType{3, 2}, LogType("32")})
 	//logs.Append(Content{LogKeyType{3, 4}, LogType("34")})
 	//fmt.Println(logs.GetPrevious(LogKeyType{0, 3}))
