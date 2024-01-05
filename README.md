@@ -135,8 +135,8 @@ db.conf文件示例：
 "candidateVoteTimeout":30,
 }
 ```
-
-```json
+解释
+```
 {
 "id":0, # 本节点ID
 "num":5, # 当前节点数量
