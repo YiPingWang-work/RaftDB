@@ -138,16 +138,16 @@ db.conf文件示例：
 
 ```json
 {
-"id":0, // 本节点ID
-"num":5, // 当前节点数量
-"term":0, // 本节点当前任期（不要设置）
-"ckt":-1, // 已提交最高日志任期
-"cki":-1, // 已提交最高日志编号
-"dns":["localhost:18000","localhost:18001","localhost:18002","localhost:18003","localhost:18004"], // 所有节点地址
-"leaderHeartbeat":10, // leader心跳间隔
-"followerTimeout":20, // follower超时时间
-"candidatePreVoteTimeout":30, // 预选举超时时间
-"candidateVoteTimeout":30, // 选举超时基础时间
+"id":0, # 本节点ID
+"num":5, # 当前节点数量
+"term":0, # 本节点当前任期（不要设置）
+"ckt":-1, # 已提交最高日志任期
+"cki":-1, # 已提交最高日志编号
+"dns":["localhost:18000","localhost:18001","localhost:18002","localhost:18003","localhost:18004"], # 所有节点地址
+"leaderHeartbeat":10, # leader心跳间隔
+"followerTimeout":20, # follower超时时间
+"candidatePreVoteTimeout":30, # 预选举超时时间
+"candidateVoteTimeout":30, # 选举超时基础时间
 }
 ```
 
@@ -165,7 +165,7 @@ db.conf文件示例：
 
 客户端使用
 
-```json
+```
 > cd ./RaftDB_client
 > go build main.go
 > main [leader的IP和端口，例如 localhost:18000] [日志信息，例如 hello]
