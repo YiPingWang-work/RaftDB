@@ -320,6 +320,7 @@ func (l *Logs) GetLogsByRange(begin LogKeyType, end LogKeyType) []Content { // è
 	l.m.RLock()
 	beginIter, endIter := l.Iterator(begin), l.Iterator(end)
 	if beginIter == -1 || endIter == -1 || beginIter > endIter {
+		l.m.RLock()
 		return []Content{}
 	} else {
 		tmp := make([]Content, endIter-beginIter+1)
