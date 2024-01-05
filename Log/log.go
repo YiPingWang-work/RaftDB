@@ -101,11 +101,11 @@ func (l *Logs) GetCommitted() LogKeyType { // 获取最后一笔提交日志Key
 }
 
 func (l *Logs) Append(content Content) { // 幂等的增加日志
+	l.m.Lock()
 	if len(l.contents) == 0 || l.GetLast().Less(content.LogKey) {
-		l.m.Lock()
 		l.contents = append(l.contents, content)
-		l.m.Unlock()
 	}
+	l.m.Unlock()
 }
 
 //func (l *Logs) GetContentByKeySlow(key LogKeyType) (LogType, error) { // 通过Key寻找指定日志，找不到返回空
@@ -199,6 +199,7 @@ func (l *Logs) GetPrevious(key LogKeyType) LogKeyType {
 			if mid >= 1 {
 				res = l.contents[mid-1].LogKey
 			}
+			break
 		} else if l.contents[mid].LogKey.Greater(key) {
 			right = mid - 1
 		} else {
@@ -320,7 +321,7 @@ func (l *Logs) GetLogsByRange(begin LogKeyType, end LogKeyType) []Content { // �
 	l.m.RLock()
 	beginIter, endIter := l.Iterator(begin), l.Iterator(end)
 	if beginIter == -1 || endIter == -1 || beginIter > endIter {
-		l.m.RLock()
+		l.m.RUnlock()
 		return []Content{}
 	} else {
 		tmp := make([]Content, endIter-beginIter+1)
