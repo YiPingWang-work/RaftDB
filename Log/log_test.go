@@ -14,9 +14,11 @@ func TestLogs(t *testing.T) {
 	logs.Append(Content{LogKeyType{2, 1}, LogType("21")})
 	logs.Append(Content{LogKeyType{2, 2}, LogType("22")})
 	logs.Append(Content{LogKeyType{2, 1}, LogType("2uuu}")})
+	logs.Append(Content{LogKeyType{4, 1}, LogType("2uuu}")})
+	//log.Printf(logs.ToString())
+	//logs.Remove(LogKeyType{2, 2})
 	log.Printf(logs.ToString())
-	logs.Remove(LogKeyType{2, 2})
-	log.Printf(logs.ToString())
+	log.Println(logs.GetPrevious2(LogKeyType{4, 3}))
 	//logs.Append(Content{LogKeyType{3, 2}, LogType("32")})
 	//logs.Append(Content{LogKeyType{3, 4}, LogType("34")})
 	//fmt.Println(logs.GetPrevious(LogKeyType{0, 3}))
@@ -35,6 +37,5 @@ func TestLogs(t *testing.T) {
 	//fmt.Println(logs.GetNext(LogKeyType{2, 1}))
 	//fmt.Println(logs.GetLogsByRange(LogKeyType{-1, -1}, LogKeyType{2, 1}))
 	//fmt.Println(u.ToString())
-	x := "14289472242^hello$1^^2$1"
-	log.Println(StringToLog(x))
+
 }

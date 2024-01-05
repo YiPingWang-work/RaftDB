@@ -188,23 +188,42 @@ func (l *Logs) Append(content Content) { // 幂等的增加日志
 //	l.m.RUnlock()
 //	return contents
 //}
+//
+//func (l *Logs) GetPreviousSlow(key LogKeyType) LogKeyType {
+//	res := LogKeyType{Term: -1, Index: -1}
+//	l.m.RLock()
+//	left, right := 0, len(l.contents)-1
+//	for left <= right {
+//		mid := (left + right) / 2
+//		if l.contents[mid].LogKey.Equals(key) {
+//			if mid >= 1 {
+//				res = l.contents[mid-1].LogKey
+//			}
+//			break
+//		} else if l.contents[mid].LogKey.Greater(key) {
+//			right = mid - 1
+//		} else {
+//			left = mid + 1
+//		}
+//	}
+//	l.m.RUnlock()
+//	return res
+//}
 
 func (l *Logs) GetPrevious(key LogKeyType) LogKeyType {
-	res := LogKeyType{Term: -1, Index: -1}
 	l.m.RLock()
-	left, right := 0, len(l.contents)
-	for left <= right {
-		mid := (left + right) / 2
-		if l.contents[mid].LogKey.Equals(key) {
-			if mid >= 1 {
-				res = l.contents[mid-1].LogKey
-			}
-			break
-		} else if l.contents[mid].LogKey.Greater(key) {
+	left, right := 0, len(l.contents)-1
+	for left < right {
+		mid := (left + right + 1) / 2
+		if !l.contents[mid].LogKey.Less(key) {
 			right = mid - 1
 		} else {
-			left = mid + 1
+			left = mid
 		}
+	}
+	res := LogKeyType{Term: -1, Index: -1}
+	if l.contents[left].LogKey.Less(key) {
+		res = l.contents[left].LogKey
 	}
 	l.m.RUnlock()
 	return res
@@ -233,7 +252,7 @@ func (l *Logs) GetContentByKey(key LogKeyType) (LogType, error) { // 通过Key�
 	var res LogType
 	err := errors.New("error: can not find this log by key")
 	l.m.RLock()
-	left, right := 0, len(l.contents)
+	left, right := 0, len(l.contents)-1
 	for left <= right {
 		mid := (left + right) / 2
 		if l.contents[mid].LogKey.Equals(key) {
@@ -303,7 +322,7 @@ func (l *Logs) Remove(key LogKeyType) (LogKeyType, error) { // 删除日志直�
 }
 
 func (l *Logs) Iterator(key LogKeyType) int { // 根据Key返回迭代器，没找到返回-1，线程不安全
-	left, right := 0, len(l.contents)
+	left, right := 0, len(l.contents)-1
 	for left <= right {
 		mid := (left + right) / 2
 		if l.contents[mid].LogKey.Equals(key) {
