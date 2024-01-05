@@ -146,5 +146,5 @@ func (m *Me) switchToCandidate() error { // 切换为candidate
 }
 
 func (m *Me) ToString() string { // 打印当前逻辑信息和日志信息
-	return m.meta.ToString() + "\n" + m.role.ToString() + "\n" + m.logs.ToString()
+	return m.meta.ToString() + "\n" + m.role.ToString()
 }

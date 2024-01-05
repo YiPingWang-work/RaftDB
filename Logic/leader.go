@@ -172,7 +172,6 @@ func (l *Leader) processTimeout(me *Me) error {
 	}}
 	me.timer = time.After(me.leaderHeartbeat)
 	log.Println("Leader: timeout")
-	log.Printf("\n%s\n", me.ToString())
 	return nil
 }
 
