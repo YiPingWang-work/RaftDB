@@ -28,7 +28,7 @@ func (c *Candidate) processHeartbeat(msg Order.Msg, me *Me) error { // 收到同
 	return me.switchToFollower(msg.Term, true, msg)
 }
 
-func (c *Candidate) processRequest(msg Order.Msg, me *Me) error { // 收到同级日志请求，直接转化为follower
+func (c *Candidate) processAppendLog(msg Order.Msg, me *Me) error { // 收到同级日志请求，直接转化为follower
 	return me.switchToFollower(msg.Term, true, msg)
 }
 
@@ -36,12 +36,12 @@ func (c *Candidate) processCommit(msg Order.Msg, me *Me) error { // 收到同级
 	return me.switchToFollower(msg.Term, true, msg)
 }
 
-func (c *Candidate) processRequestReply(msg Order.Msg, me *Me) error {
+func (c *Candidate) processAppendLogReply(msg Order.Msg, me *Me) error {
 	return nil
 }
 
 func (c *Candidate) processVote(msg Order.Msg, me *Me) error { // 候选人不给任何同级的其他人投票
-	me.replyChan <- Order.Order{Type: Order.Send, Msg: Order.Msg{
+	me.replyChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Msg{
 		Type:  Order.VoteReply,
 		From:  me.meta.Id,
 		To:    []int{msg.From},
@@ -75,7 +75,7 @@ func (c *Candidate) processVoteReply(msg Order.Msg, me *Me) error {
 }
 
 func (c *Candidate) processPreVote(msg Order.Msg, me *Me) error {
-	me.replyChan <- Order.Order{Type: Order.Send, Msg: Order.Msg{
+	me.replyChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Msg{
 		Type: Order.PreVoteReply,
 		From: me.meta.Id,
 		To:   []int{msg.From},
@@ -125,9 +125,18 @@ func (c *Candidate) processTimeout(me *Me) error {
 		reply.Type = Order.PreVote
 	}
 	reply.Term = me.meta.Term
-	me.replyChan <- Order.Order{Type: Order.Send, Msg: reply}
+	me.replyChan <- Order.Order{Type: Order.NodeReply, Msg: reply}
 	me.timer = time.After(me.candidatePreVoteTimeout)
 	return nil
+}
+
+func (c *Candidate) processExpansion(msg Order.Msg, me *Me) error {
+	return errors.New("error: candidate can not expanse")
+}
+
+func (c *Candidate) processExpansionReply(msg Order.Msg, me *Me) error {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (c *Candidate) ToString() string {

@@ -23,9 +23,9 @@ func (f *Follower) init(me *Me) error {
 func (f *Follower) processHeartbeat(msg Order.Msg, me *Me) error {
 	me.timer = time.After(me.followerTimeout)
 	if !me.logs.GetLast().Equals(msg.LastLogKey) { // 如果在心跳过程中，发现自己的日志不是leader的最新日志，发送一个缺少消息，使用-1 -1 默认让leader发送自己最大的消息
-		log.Println("Follower: my log is not complete")
-		me.replyChan <- Order.Order{Type: Order.Send, Msg: Order.Msg{
-			Type:       Order.RequestReply,
+		log.Println("Follower: my logs are not complete")
+		me.replyChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Msg{
+			Type:       Order.AppendLogReply,
 			From:       me.meta.Id,
 			To:         []int{msg.From},
 			Term:       me.meta.Term,
@@ -36,9 +36,9 @@ func (f *Follower) processHeartbeat(msg Order.Msg, me *Me) error {
 	return nil
 }
 
-func (f *Follower) processRequest(msg Order.Msg, me *Me) error {
+func (f *Follower) processAppendLog(msg Order.Msg, me *Me) error {
 	reply := Order.Msg{
-		Type:       Order.RequestReply,
+		Type:       Order.AppendLogReply,
 		From:       me.meta.Id,
 		To:         []int{msg.From},
 		Term:       me.meta.Term,
@@ -48,7 +48,7 @@ func (f *Follower) processRequest(msg Order.Msg, me *Me) error {
 		if _, err := me.logs.Remove(msg.SecondLastLogKey); err != nil {
 			return err
 		}
-		log.Printf("Follower: receive a less key %v from %d\n, remove until last key is %v\n",
+		log.Printf("Follower: receive a less log %v from %d\n, remove logs until last log is %v\n",
 			msg.From, msg.SecondLastLogKey, me.logs.GetLast())
 	}
 	if me.logs.GetLast().Equals(msg.SecondLastLogKey) { // 同意追加消息
@@ -58,14 +58,14 @@ func (f *Follower) processRequest(msg Order.Msg, me *Me) error {
 	} else { // 还有别的消息没有到达，等待补全
 		reply.Agree = false
 		// reply.SecondLastLogKey = me.logs.GetLast() // 自己的最后一条消息位置信息放在SecondLastLogKey字段中，暂时没有优化
-		log.Printf("Follower: refuse %d's request %v, my last key is %v\n", msg.From, msg.LastLogKey, me.logs.GetLast())
+		log.Printf("Follower: refuse %d's request %v, my last log is %v\n", msg.From, msg.LastLogKey, me.logs.GetLast())
 	}
-	me.replyChan <- Order.Order{Type: Order.Send, Msg: reply}
+	me.replyChan <- Order.Order{Type: Order.NodeReply, Msg: reply}
 	me.timer = time.After(me.followerTimeout)
 	return nil
 }
 
-func (f *Follower) processRequestReply(msg Order.Msg, me *Me) error {
+func (f *Follower) processAppendLogReply(msg Order.Msg, me *Me) error {
 	return nil
 }
 
@@ -88,7 +88,7 @@ func (f *Follower) processCommit(msg Order.Msg, me *Me) error {
 		me.replyChan <- Order.Order{Type: Order.Store, Msg: Order.Msg{Agree: true, Log: Log.LogType(string(metaTmp))}}
 	}
 	me.timer = time.After(me.followerTimeout)
-	log.Printf("Follower: commit logs with key from %v to %v\n",
+	log.Printf("Follower: commit logs whose key from %v to %v\n",
 		me.logs.GetNext(previousCommitted), me.logs.GetCommitted())
 	return nil
 }
@@ -110,7 +110,7 @@ func (f *Follower) processVote(msg Order.Msg, me *Me) error {
 		log.Printf("Follower: agree %d's vote\n", msg.From)
 	}
 	me.replyChan <- Order.Order{
-		Type: Order.Send,
+		Type: Order.NodeReply,
 		Msg:  reply,
 	}
 	return nil
@@ -121,7 +121,7 @@ func (f *Follower) processVoteReply(msg Order.Msg, me *Me) error {
 }
 
 func (f *Follower) processPreVote(msg Order.Msg, me *Me) error {
-	me.replyChan <- Order.Order{Type: Order.Send, Msg: Order.Msg{
+	me.replyChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Msg{
 		Type: Order.PreVoteReply,
 		From: me.meta.Id,
 		To:   []int{msg.From},
@@ -141,6 +141,15 @@ func (f *Follower) processClient(req Log.LogType, me *Me) error {
 func (f *Follower) processTimeout(me *Me) error {
 	log.Println("Follower: timeout")
 	return me.switchToCandidate()
+}
+
+func (f *Follower) processExpansion(msg Order.Msg, me *Me) error {
+	return errors.New("error: candidate can not expanse")
+}
+
+func (f *Follower) processExpansionReply(msg Order.Msg, me *Me) error {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (f *Follower) ToString() string {

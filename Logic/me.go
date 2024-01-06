@@ -28,13 +28,15 @@ type Me struct {
 type Role interface {
 	init(me *Me) error
 	processHeartbeat(msg Order.Msg, me *Me) error
-	processRequest(msg Order.Msg, me *Me) error
-	processRequestReply(msg Order.Msg, me *Me) error
+	processAppendLog(msg Order.Msg, me *Me) error
+	processAppendLogReply(msg Order.Msg, me *Me) error
 	processCommit(msg Order.Msg, me *Me) error
 	processVote(msg Order.Msg, me *Me) error
 	processVoteReply(msg Order.Msg, me *Me) error
 	processPreVote(msg Order.Msg, me *Me) error
 	processPreVoteReply(msg Order.Msg, me *Me) error
+	processExpansion(msg Order.Msg, me *Me) error
+	processExpansionReply(msg Order.Msg, me *Me) error
 	processClient(req Log.LogType, me *Me) error
 	processTimeout(me *Me) error
 	ToString() string
@@ -91,10 +93,10 @@ func (m *Me) process(msg Order.Msg) error { // 所有状态处理其它节点消
 	switch msg.Type { // 处理不同类型的消息
 	case Order.Heartbeat:
 		return m.role.processHeartbeat(msg, m)
-	case Order.Request:
-		return m.role.processRequest(msg, m)
-	case Order.RequestReply:
-		return m.role.processRequestReply(msg, m)
+	case Order.AppendLog:
+		return m.role.processAppendLog(msg, m)
+	case Order.AppendLogReply:
+		return m.role.processAppendLogReply(msg, m)
 	case Order.Commit:
 		return m.role.processCommit(msg, m)
 	case Order.Vote:

@@ -56,8 +56,7 @@ func (b *Bottom) Run() {
 					}
 				}
 			}
-			if order.Type == Order.Send {
-				//log.Printf("send: %s\n", order.ToString())
+			if order.Type == Order.NodeReply {
 				if err := b.communicate.Send(order.Msg.To, order.Msg); err != nil {
 					log.Println(err)
 				}
