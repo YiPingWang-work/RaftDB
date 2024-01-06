@@ -3,31 +3,29 @@ package Communicate
 import (
 	"RaftDB/Order"
 	"fmt"
-	"time"
 )
 
 type Communicate struct {
-	cable        Cable
-	dns          []string
-	addr         string
-	networkDelay time.Duration //mo模拟网络延迟
+	cable Cable
+	dns   []string
+	addr  string
 }
 
 type Cable interface {
-	send(myAddr string, yourAddr string, msg Order.Msg, netWorkDelay time.Duration)
+	send(myAddr string, yourAddr string, msg Order.Msg)
 	listenAndServe(myAddr string, replyChan chan<- Order.Order) error
 	changeClientLicence(st bool)
 	replyClient(st bool)
+	changeNetworkDelay(delay int, random int)
 }
 
-func (c *Communicate) Init(cable Cable, addr string, dns []string, networkDelay int) {
+func (c *Communicate) Init(cable Cable, addr string, dns []string) {
 	c.cable, c.addr, c.dns = cable, addr, dns
-	c.networkDelay = time.Duration(networkDelay) * time.Millisecond
 }
 
 func (c *Communicate) Send(members []int, msg Order.Msg) error {
 	for _, v := range members {
-		go c.cable.send(c.addr, c.dns[v], msg, c.networkDelay)
+		go c.cable.send(c.addr, c.dns[v], msg)
 	}
 	return nil
 }
@@ -44,4 +42,8 @@ func (c *Communicate) ChangeClientLicence(st bool) {
 
 func (c *Communicate) ReplyClient(st bool) {
 	c.cable.replyClient(st)
+}
+
+func (c *Communicate) ChangeNetworkDelay(delay int, random int) {
+	c.cable.changeNetworkDelay(delay, random)
 }

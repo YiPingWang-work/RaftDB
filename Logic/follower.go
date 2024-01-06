@@ -22,7 +22,7 @@ func (f *Follower) init(me *Me) error {
 
 func (f *Follower) processHeartbeat(msg Order.Msg, me *Me) error {
 	me.timer = time.After(me.followerTimeout)
-	if me.logs.GetLast().Less(msg.LastLogKey) { // 如果在心跳过程中，发现自己的日志小于leader的日志，发送一个缺少消息，使用-1 -1 默认让leader发送自己最大的消息
+	if !me.logs.GetLast().Equals(msg.LastLogKey) { // 如果在心跳过程中，发现自己的日志不是leader的最新日志，发送一个缺少消息，使用-1 -1 默认让leader发送自己最大的消息
 		log.Println("Follower: my log is not complete")
 		me.replyChan <- Order.Order{
 			Type: Order.Send,

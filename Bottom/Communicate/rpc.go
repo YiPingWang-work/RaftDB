@@ -10,12 +10,14 @@ import (
 )
 
 type RPC struct {
-	clientLicence bool
-	clientChan    chan bool
-	replyChan     chan<- Order.Order
+	clientLicence      bool
+	clientChan         chan bool
+	replyChan          chan<- Order.Order
+	networkDelay       time.Duration
+	networkDelayRandom int
 }
 
-func (r *RPC) send(myAddr string, yourAddr string, msg Order.Msg, networkDelay time.Duration) {
+func (r *RPC) send(myAddr string, yourAddr string, msg Order.Msg) {
 	if myAddr == yourAddr {
 		return
 	}
@@ -23,13 +25,14 @@ func (r *RPC) send(myAddr string, yourAddr string, msg Order.Msg, networkDelay t
 	if err != nil {
 		return
 	}
-	time.Sleep(time.Duration(rand.Intn(10)) * networkDelay)
+	time.Sleep(r.networkDelay)
 	_ = client.Call("RPC.Push", msg, nil)
 }
 
 func (r *RPC) listenAndServe(myAddr string, replyChan chan<- Order.Order) error {
-	r.clientChan = make(chan bool, 1000)
-	r.replyChan = replyChan
+	r.clientChan, r.replyChan = make(chan bool, 1000), replyChan
+	r.changeNetworkDelay(0, 0)
+	r.changeClientLicence(false)
 	if err := rpc.RegisterName("RPC", r); err != nil {
 		return err
 	}
@@ -49,6 +52,14 @@ func (r *RPC) listenAndServe(myAddr string, replyChan chan<- Order.Order) error 
 
 func (r *RPC) changeClientLicence(st bool) {
 	r.clientLicence = st
+}
+
+func (r *RPC) changeNetworkDelay(delay int, random int) {
+	if random == 0 {
+		r.networkDelay = time.Duration(delay) * time.Millisecond
+	} else {
+		r.networkDelay = time.Duration(rand.Intn(random)*delay) * time.Millisecond
+	}
 }
 
 func (r *RPC) replyClient(st bool) {

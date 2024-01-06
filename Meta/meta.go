@@ -13,7 +13,6 @@ type Meta struct {
 	FollowerTimeout         int      `json:"followerTimeout"`
 	CandidatePreVoteTimeout int      `json:"candidatePreVoteTimeout"`
 	CandidateVoteTimeout    int      `json:"candidateVoteTimeout"`
-	NetworkDelay            int      `json:"networkDelay"`
 }
 
 func (m *Meta) ToString() string {

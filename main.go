@@ -29,7 +29,7 @@ func gogo(confPath string, filePath string) {
 	log.Printf("\n%s\n", logs.ToString())                                    // 输出日志信息
 	me.Init(&meta, &logs, ToLogicChan, ToBottomChan)                         // 初始化Raft层
 	go bottom.Run()                                                          // 运行底座，运行网络监听，开始对接端口Msg.ToLogicChan, Order.ReplyChan监听
-	go Monitor.Monitor(&me, &logs)                                           // 开启监控程序
+	go Monitor.Monitor(&me, &logs, &bottom)                                  // 开启监控程序
 	me.Run()                                                                 // 运行逻辑层，开始对接端口Msg.ToLogicChan, Order.ReplyChan监听
 }
 
