@@ -53,13 +53,11 @@ func (l *Leader) processRequestReply(msg Order.Msg, me *Me) error { // 处理回
 			if len(l.agree[msg.LastLogKey]) >= me.quorum && me.meta.Term == msg.LastLogKey.Term { // 如果票数超过quorum同时是自己任期发出的，则leader提交，通知所有的follower提交
 				previousCommitted := me.logs.Commit(msg.LastLogKey)
 				me.meta.CommittedKeyTerm, me.meta.CommittedKeyIndex = me.logs.GetCommitted().Term, me.logs.GetCommitted().Index
-				me.replyChan <- Order.Order{
-					Type: Order.Store,
-					Msg: Order.Msg{
-						Agree:            false,
-						LastLogKey:       me.logs.GetCommitted(),
-						SecondLastLogKey: me.logs.GetNext(previousCommitted),
-					}}
+				me.replyChan <- Order.Order{Type: Order.Store, Msg: Order.Msg{
+					Agree:            false,
+					LastLogKey:       me.logs.GetCommitted(),
+					SecondLastLogKey: me.logs.GetNext(previousCommitted),
+				}}
 				me.replyChan <- Order.Order{Type: Order.ClientReply, Msg: Order.Msg{Agree: true}} // 向客户端返回正确
 				if metaTmp, err := json.Marshal(*me.meta); err != nil {
 					return err

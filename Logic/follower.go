@@ -24,16 +24,14 @@ func (f *Follower) processHeartbeat(msg Order.Msg, me *Me) error {
 	me.timer = time.After(me.followerTimeout)
 	if !me.logs.GetLast().Equals(msg.LastLogKey) { // 如果在心跳过程中，发现自己的日志不是leader的最新日志，发送一个缺少消息，使用-1 -1 默认让leader发送自己最大的消息
 		log.Println("Follower: my log is not complete")
-		me.replyChan <- Order.Order{
-			Type: Order.Send,
-			Msg: Order.Msg{
-				Type:       Order.RequestReply,
-				From:       me.meta.Id,
-				To:         []int{msg.From},
-				Term:       me.meta.Term,
-				Agree:      false,
-				LastLogKey: Log.LogKeyType{Term: -1, Index: -1},
-			}}
+		me.replyChan <- Order.Order{Type: Order.Send, Msg: Order.Msg{
+			Type:       Order.RequestReply,
+			From:       me.meta.Id,
+			To:         []int{msg.From},
+			Term:       me.meta.Term,
+			Agree:      false,
+			LastLogKey: Log.LogKeyType{Term: -1, Index: -1},
+		}}
 	}
 	return nil
 }
