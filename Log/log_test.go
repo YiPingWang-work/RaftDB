@@ -7,7 +7,7 @@ import (
 
 func TestLogs(t *testing.T) {
 	logs := Logs{}
-	logs.Init(0, 1)
+	logs.Init(-1, -1)
 	logs.Append(Content{LogKeyType{0, 1}, LogType("01")})
 	logs.Append(Content{LogKeyType{0, 2}, LogType("02")})
 	logs.Append(Content{LogKeyType{0, 3}, LogType("03")})
@@ -19,6 +19,11 @@ func TestLogs(t *testing.T) {
 	//logs.Remove(LogKeyType{2, 2})
 	log.Printf(logs.ToString())
 	log.Println(logs.GetPrevious(LogKeyType{4, 3}))
+	log.Println(logs.Remove(LogKeyType{4, 3}))
+	log.Printf(logs.ToString())
+	log.Println(logs.Remove(LogKeyType{0, 1}))
+	log.Printf(logs.ToString())
+	log.Println(logs.Remove(LogKeyType{-1, -1}))
 	//logs.Append(Content{LogKeyType{3, 2}, LogType("32")})
 	//logs.Append(Content{LogKeyType{3, 4}, LogType("34")})
 	//fmt.Println(logs.GetPrevious(LogKeyType{0, 3}))

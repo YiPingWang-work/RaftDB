@@ -47,10 +47,10 @@ func (m *Me) Init(meta *Meta.Meta, logs *Log.Logs, receiveChan <-chan Order.Orde
 	for i := 0; i < meta.Num; i++ {
 		m.members[i] = i
 	}
-	m.leaderHeartbeat = time.Duration(meta.LeaderHeartbeat) * time.Second
-	m.followerTimeout = time.Duration(meta.FollowerTimeout) * time.Second
-	m.candidateVoteTimeout = time.Duration(meta.CandidateVoteTimeout) * time.Second
-	m.candidatePreVoteTimeout = time.Duration(meta.CandidatePreVoteTimeout) * time.Second
+	m.leaderHeartbeat = time.Duration(meta.LeaderHeartbeat) * time.Millisecond
+	m.followerTimeout = time.Duration(meta.FollowerTimeout) * time.Millisecond
+	m.candidateVoteTimeout = time.Duration(meta.CandidateVoteTimeout) * time.Millisecond
+	m.candidatePreVoteTimeout = time.Duration(meta.CandidatePreVoteTimeout) * time.Millisecond
 	if err := m.switchToFollower(m.meta.Term, false, Order.Msg{}); err != nil {
 		log.Println(err)
 	}

@@ -29,7 +29,7 @@ func (b *Bottom) Init(confPath string, filePath string, meta *Meta.Meta, logs *L
 		}
 	}
 	logs.Init(meta.CommittedKeyTerm, meta.CommittedKeyIndex)
-	b.communicate.Init(new(Communicate.RPC), meta.Dns[meta.Id], meta.Dns[0:meta.Num])
+	b.communicate.Init(new(Communicate.RPC), meta.Dns[meta.Id], meta.Dns[0:meta.Num], meta.NetworkDelay)
 }
 
 func (b *Bottom) Run() {

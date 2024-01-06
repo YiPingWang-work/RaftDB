@@ -3,6 +3,7 @@ package Communicate
 import (
 	"RaftDB/Order"
 	"log"
+	"math/rand"
 	"net"
 	"net/rpc"
 	"time"
@@ -14,7 +15,7 @@ type RPC struct {
 	replyChan     chan<- Order.Order
 }
 
-func (r *RPC) send(myAddr string, yourAddr string, msg Order.Msg) {
+func (r *RPC) send(myAddr string, yourAddr string, msg Order.Msg, networkDelay time.Duration) {
 	if myAddr == yourAddr {
 		return
 	}
@@ -22,6 +23,7 @@ func (r *RPC) send(myAddr string, yourAddr string, msg Order.Msg) {
 	if err != nil {
 		return
 	}
+	time.Sleep(time.Duration(rand.Intn(10)) * networkDelay)
 	_ = client.Call("RPC.Push", msg, nil)
 }
 

@@ -21,7 +21,6 @@ type Candidate struct {
 func (c *Candidate) init(me *Me) error {
 	c.agree = map[int]bool{}
 	c.state = 0
-	// me.timer = time.After(time.Duration(rand.Intn(5000)) * time.Millisecond)
 	return c.processTimeout(me)
 }
 
