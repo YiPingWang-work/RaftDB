@@ -15,7 +15,7 @@ type Cable interface {
 	send(myAddr string, yourAddr string, msg Order.Msg)
 	listenAndServe(myAddr string, replyChan chan<- Order.Order) error
 	changeClientLicence(st bool)
-	replyClient(st bool)
+	replyClient(msg Order.Msg)
 	changeNetworkDelay(delay int, random int)
 }
 
@@ -23,8 +23,8 @@ func (c *Communicate) Init(cable Cable, addr string, dns []string) {
 	c.cable, c.addr, c.dns = cable, addr, dns
 }
 
-func (c *Communicate) Send(members []int, msg Order.Msg) error {
-	for _, v := range members {
+func (c *Communicate) Send(msg Order.Msg) error {
+	for _, v := range msg.To {
 		go c.cable.send(c.addr, c.dns[v], msg)
 	}
 	return nil
@@ -40,8 +40,8 @@ func (c *Communicate) ChangeClientLicence(st bool) {
 	c.cable.changeClientLicence(st)
 }
 
-func (c *Communicate) ReplyClient(st bool) {
-	c.cable.replyClient(st)
+func (c *Communicate) ReplyClient(msg Order.Msg) {
+	c.cable.replyClient(msg)
 }
 
 func (c *Communicate) ChangeNetworkDelay(delay int, random int) {

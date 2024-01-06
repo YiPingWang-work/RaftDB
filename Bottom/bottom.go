@@ -13,14 +13,14 @@ type Bottom struct {
 	communicate Communicate.Communicate
 	store       Store.Store
 	logs        *Log.Logs
-	receiveChan <-chan Order.Order // 接收me消息的管道
-	replyChan   chan<- Order.Order // 发送消息给me的管道
+	fromMeChan  <-chan Order.Order // 接收me消息的管道
+	toMeChan    chan<- Order.Order // 发送消息给me的管道
 }
 
 func (b *Bottom) Init(confPath string, filePath string, meta *Meta.Meta, logs *Log.Logs,
-	receiveChan <-chan Order.Order, replyChan chan<- Order.Order) {
+	fromMeChan <-chan Order.Order, toMeChan chan<- Order.Order) {
 	b.store, b.logs = Store.Store{}, logs
-	b.receiveChan, b.replyChan = receiveChan, replyChan
+	b.fromMeChan, b.toMeChan = fromMeChan, toMeChan
 	var tmp []string
 	b.store.Init(new(Store.CommonFile), confPath, filePath, meta, &tmp)
 	for _, v := range tmp {
@@ -33,10 +33,10 @@ func (b *Bottom) Init(confPath string, filePath string, meta *Meta.Meta, logs *L
 }
 
 func (b *Bottom) Run() {
-	go b.communicate.ListenAndServe(b.replyChan)
+	go b.communicate.ListenAndServe(b.toMeChan)
 	for {
 		select {
-		case order, ok := <-b.receiveChan:
+		case order, ok := <-b.fromMeChan:
 			if !ok {
 				log.Println("Bottom: Bye")
 				return
@@ -57,7 +57,7 @@ func (b *Bottom) Run() {
 				}
 			}
 			if order.Type == Order.NodeReply {
-				if err := b.communicate.Send(order.Msg.To, order.Msg); err != nil {
+				if err := b.communicate.Send(order.Msg); err != nil {
 					log.Println(err)
 				}
 			}
@@ -65,7 +65,7 @@ func (b *Bottom) Run() {
 				b.communicate.ChangeClientLicence(order.Msg.Agree)
 			}
 			if order.Type == Order.ClientReply {
-				b.communicate.ReplyClient(order.Msg.Agree)
+				b.communicate.ReplyClient(order.Msg)
 			}
 		}
 	}

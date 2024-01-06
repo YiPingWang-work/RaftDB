@@ -11,7 +11,7 @@ import (
 
 type RPC struct {
 	clientLicence      bool
-	clientChan         chan bool
+	clientChan         chan Order.Msg
 	replyChan          chan<- Order.Order
 	networkDelay       time.Duration
 	networkDelayRandom int
@@ -30,7 +30,7 @@ func (r *RPC) send(myAddr string, yourAddr string, msg Order.Msg) {
 }
 
 func (r *RPC) listenAndServe(myAddr string, replyChan chan<- Order.Order) error {
-	r.clientChan, r.replyChan = make(chan bool, 1000), replyChan
+	r.clientChan, r.replyChan = make(chan Order.Msg, 1000), replyChan
 	r.changeNetworkDelay(0, 0)
 	r.changeClientLicence(false)
 	if err := rpc.RegisterName("RPC", r); err != nil {
@@ -62,8 +62,8 @@ func (r *RPC) changeNetworkDelay(delay int, random int) {
 	}
 }
 
-func (r *RPC) replyClient(st bool) {
-	r.clientChan <- st
+func (r *RPC) replyClient(msg Order.Msg) {
+	r.clientChan <- msg
 }
 
 func (r *RPC) Push(rec Order.Msg, rep *string) error {
@@ -76,8 +76,8 @@ func (r *RPC) Write(rec Order.Msg, rep *string) error {
 	timer := time.After(time.Duration(rec.Term) * time.Millisecond)
 	if r.clientLicence {
 		select {
-		case ok := <-r.clientChan:
-			if ok {
+		case msg := <-r.clientChan:
+			if msg.Agree {
 				*rep = "ok"
 			} else {
 				*rep = "refuse"

@@ -350,6 +350,22 @@ func (l *Logs) GetLogsByRange(begin LogKeyType, end LogKeyType) []Content { // �
 	}
 }
 
+func (l *Logs) GetKeysByRange(begin LogKeyType, end LogKeyType) []LogKeyType { // 返回 [begin, end]区间内的所有日志信息
+	l.m.RLock()
+	beginIter, endIter := l.Iterator(begin), l.Iterator(end)
+	if beginIter == -1 || endIter == -1 || beginIter > endIter {
+		l.m.RUnlock()
+		return []LogKeyType{}
+	} else {
+		tmp := make([]LogKeyType, endIter-beginIter+1)
+		for i := beginIter; i <= endIter+1; i++ {
+			tmp[i] = l.contents[i].LogKey
+		}
+		l.m.RUnlock()
+		return tmp
+	}
+}
+
 func (l *Logs) ToString() string {
 	l.m.RLock()
 	res := fmt.Sprintf("==== logs ====\ncontents: %v\ncommittedKey: %v\n==== logs ====", l.contents, l.committedKey)

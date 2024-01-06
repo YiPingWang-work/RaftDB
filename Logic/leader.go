@@ -13,12 +13,14 @@ import (
 var leader Leader
 
 type Leader struct {
-	agree map[Log.LogKeyType]map[int]bool // 对于哪条记录，同意的follower集合
-	index int                             // 当前日志的index
+	agree        map[Log.LogKeyType]map[int]bool // 对于哪条记录，同意的follower集合
+	client       map[Log.LogKeyType]int          // 对应agree的是哪个client发出的
+	agreeAddNode map[string]map[int]bool         // 对于某次节点变更，同意的follower集合
+	index        int                             // 当前日志的index
 }
 
 func (l *Leader) init(me *Me) error {
-	l.agree, l.index = map[Log.LogKeyType]map[int]bool{}, 0
+	l.agree, l.agreeAddNode, l.index = map[Log.LogKeyType]map[int]bool{}, map[string]map[int]bool{}, 0
 	return l.processTimeout(me)
 }
 
@@ -44,28 +46,33 @@ func (l *Leader) processAppendLogReply(msg Order.Msg, me *Me) error { // 处理�
 	if msg.Agree == true { // 如果follower同意我的请求
 		if !me.logs.GetCommitted().Less(msg.LastLogKey) { // 如果是一个leader已经提交的，leader对其返回一个提交
 			reply.Type, reply.To = Order.Commit, []int{msg.From}
-			if l.agree[msg.LastLogKey] != nil { // 如果自己的同意列表中还有这条数据记录，释放空间
-				delete(l.agree, msg.LastLogKey)
-			}
 			log.Printf("Leader: %d should commit my committed log %v\n", msg.From, msg.LastLogKey)
 		} else { // 如果是一个leader没有提交的，增加票数
 			l.agree[msg.LastLogKey][msg.From] = true
 			if len(l.agree[msg.LastLogKey]) >= me.quorum && me.meta.Term == msg.LastLogKey.Term { // 如果票数超过quorum同时是自己任期发出的，则leader提交，通知所有的follower提交
 				previousCommitted := me.logs.Commit(msg.LastLogKey)
-				me.meta.CommittedKeyTerm, me.meta.CommittedKeyIndex = me.logs.GetCommitted().Term, me.logs.GetCommitted().Index
-				me.replyChan <- Order.Order{Type: Order.Store, Msg: Order.Msg{
+				me.meta.CommittedKeyTerm, me.meta.CommittedKeyIndex = msg.LastLogKey.Term, msg.LastLogKey.Index
+				secondLastKey := me.logs.GetNext(previousCommitted)
+				me.toBottomChan <- Order.Order{Type: Order.Store, Msg: Order.Msg{
 					Agree:            false,
-					LastLogKey:       me.logs.GetCommitted(),
-					SecondLastLogKey: me.logs.GetNext(previousCommitted),
+					LastLogKey:       msg.LastLogKey,
+					SecondLastLogKey: secondLastKey,
 				}}
-				me.replyChan <- Order.Order{Type: Order.ClientReply, Msg: Order.Msg{Agree: true}} // 向客户端返回正确
+				for _, v := range me.logs.GetKeysByRange(secondLastKey, msg.LastLogKey) {
+					me.toBottomChan <- Order.Order{Type: Order.ClientReply, Msg: Order.Msg{ // 向客户端返回正确，删除记录
+						From:  me.meta.Id,
+						To:    []int{l.client[v]},
+						Agree: true,
+					}}
+					delete(l.client, v)
+					delete(l.agree, v)
+				}
 				if metaTmp, err := json.Marshal(*me.meta); err != nil {
 					return err
 				} else {
-					me.replyChan <- Order.Order{Type: Order.Store, Msg: Order.Msg{Agree: true, Log: Log.LogType(metaTmp)}}
+					me.toBottomChan <- Order.Order{Type: Order.Store, Msg: Order.Msg{Agree: true, Log: Log.LogType(metaTmp)}}
 				}
-				reply.Type = Order.Commit
-				reply.To = me.members
+				reply.Type, reply.To = Order.Commit, me.members
 				me.timer = time.After(me.leaderHeartbeat)
 				log.Printf("Leader: quorum have agreed request %v, I will commit and boardcast it\n", msg.LastLogKey)
 			}
@@ -76,7 +83,7 @@ func (l *Leader) processAppendLogReply(msg Order.Msg, me *Me) error { // 处理�
 			if err != nil {
 				return err
 			}
-			me.replyChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Msg{
+			me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Msg{
 				Type:             Order.AppendLog,
 				From:             reply.From,
 				To:               []int{msg.From},
@@ -114,7 +121,7 @@ func (l *Leader) processAppendLogReply(msg Order.Msg, me *Me) error { // 处理�
 		}
 	}
 	if len(reply.To) != 0 { // 如果有需要发送，发送
-		me.replyChan <- Order.Order{Type: Order.NodeReply, Msg: reply}
+		me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: reply}
 	}
 	return nil
 }
@@ -139,28 +146,29 @@ func (l *Leader) processPreVoteReply(msg Order.Msg, me *Me) error {
 	return nil
 }
 
-func (l *Leader) processClient(req Log.LogType, me *Me) error { // 处理一个客户端请求
+func (l *Leader) processClient(msg Order.Msg, me *Me) error { // 处理一个客户端请求
 	secondLastKey := me.logs.GetLast()                               // 获取我的最后一个日志
 	lastLogKey := Log.LogKeyType{Term: me.meta.Term, Index: l.index} // 创建一个新的日志
-	me.logs.Append(Log.Content{LogKey: lastLogKey, Log: req})        // 将日志添加到本地
+	me.logs.Append(Log.Content{LogKey: lastLogKey, Log: msg.Log})    // 将日志添加到本地
 	l.agree[lastLogKey] = map[int]bool{}                             // 为agree列表添加一笔请求
-	me.replyChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Msg{
+	l.client[lastLogKey] = msg.From                                  // 设置client
+	me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Msg{
 		Type:             Order.AppendLog,
 		From:             me.meta.Id,
 		To:               me.members,
 		Term:             me.meta.Term,
 		LastLogKey:       lastLogKey,
 		SecondLastLogKey: secondLastKey,
-		Log:              req,
+		Log:              msg.Log,
 	}}
 	me.timer = time.After(me.leaderHeartbeat)
 	l.index++ // 预index++
-	log.Printf("Leader: reveive a client's request whose key: %v, log: %v, now I will broadcast it\n", lastLogKey, req)
+	log.Printf("Leader: reveive a client's request whose key: %v, log: %v, now I will broadcast it\n", lastLogKey, msg.Log)
 	return nil
 }
 
 func (l *Leader) processTimeout(me *Me) error {
-	me.replyChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Msg{
+	me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Msg{
 		Type:             Order.Heartbeat,
 		From:             me.meta.Id,
 		To:               me.members,
@@ -178,8 +186,7 @@ func (l *Leader) processExpansion(msg Order.Msg, me *Me) error {
 }
 
 func (l *Leader) processExpansionReply(msg Order.Msg, me *Me) error {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (l *Leader) ToString() string {

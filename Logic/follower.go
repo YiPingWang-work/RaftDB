@@ -24,7 +24,7 @@ func (f *Follower) processHeartbeat(msg Order.Msg, me *Me) error {
 	me.timer = time.After(me.followerTimeout)
 	if !me.logs.GetLast().Equals(msg.LastLogKey) { // 如果在心跳过程中，发现自己的日志不是leader的最新日志，发送一个缺少消息，使用-1 -1 默认让leader发送自己最大的消息
 		log.Println("Follower: my logs are not complete")
-		me.replyChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Msg{
+		me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Msg{
 			Type:       Order.AppendLogReply,
 			From:       me.meta.Id,
 			To:         []int{msg.From},
@@ -57,10 +57,9 @@ func (f *Follower) processAppendLog(msg Order.Msg, me *Me) error {
 		log.Printf("Follower: accept %d's request %v\n", msg.From, msg.LastLogKey)
 	} else { // 还有别的消息没有到达，等待补全
 		reply.Agree = false
-		// reply.SecondLastLogKey = me.logs.GetLast() // 自己的最后一条消息位置信息放在SecondLastLogKey字段中，暂时没有优化
 		log.Printf("Follower: refuse %d's request %v, my last log is %v\n", msg.From, msg.LastLogKey, me.logs.GetLast())
 	}
-	me.replyChan <- Order.Order{Type: Order.NodeReply, Msg: reply}
+	me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: reply}
 	me.timer = time.After(me.followerTimeout)
 	return nil
 }
@@ -75,7 +74,7 @@ func (f *Follower) processCommit(msg Order.Msg, me *Me) error {
 	}
 	previousCommitted := me.logs.Commit(msg.LastLogKey) // 直接提交之前的所有消息
 	me.meta.CommittedKeyTerm, me.meta.CommittedKeyIndex = me.logs.GetCommitted().Term, me.logs.GetCommitted().Index
-	me.replyChan <- Order.Order{
+	me.toBottomChan <- Order.Order{
 		Type: Order.Store,
 		Msg: Order.Msg{
 			Agree:            false,
@@ -85,7 +84,7 @@ func (f *Follower) processCommit(msg Order.Msg, me *Me) error {
 	if metaTmp, err := json.Marshal(*me.meta); err != nil {
 		return err
 	} else {
-		me.replyChan <- Order.Order{Type: Order.Store, Msg: Order.Msg{Agree: true, Log: Log.LogType(string(metaTmp))}}
+		me.toBottomChan <- Order.Order{Type: Order.Store, Msg: Order.Msg{Agree: true, Log: Log.LogType(string(metaTmp))}}
 	}
 	me.timer = time.After(me.followerTimeout)
 	log.Printf("Follower: commit logs whose key from %v to %v\n",
@@ -109,7 +108,7 @@ func (f *Follower) processVote(msg Order.Msg, me *Me) error {
 		reply.Agree = true
 		log.Printf("Follower: agree %d's vote\n", msg.From)
 	}
-	me.replyChan <- Order.Order{
+	me.toBottomChan <- Order.Order{
 		Type: Order.NodeReply,
 		Msg:  reply,
 	}
@@ -121,7 +120,7 @@ func (f *Follower) processVoteReply(msg Order.Msg, me *Me) error {
 }
 
 func (f *Follower) processPreVote(msg Order.Msg, me *Me) error {
-	me.replyChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Msg{
+	me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Msg{
 		Type: Order.PreVoteReply,
 		From: me.meta.Id,
 		To:   []int{msg.From},
@@ -134,7 +133,7 @@ func (f *Follower) processPreVoteReply(msg Order.Msg, me *Me) error {
 	return nil
 }
 
-func (f *Follower) processClient(req Log.LogType, me *Me) error {
+func (f *Follower) processClient(msg Order.Msg, me *Me) error {
 	return errors.New("error: client --x-> follower")
 }
 
@@ -144,12 +143,11 @@ func (f *Follower) processTimeout(me *Me) error {
 }
 
 func (f *Follower) processExpansion(msg Order.Msg, me *Me) error {
-	return errors.New("error: candidate can not expanse")
+	return nil
 }
 
 func (f *Follower) processExpansionReply(msg Order.Msg, me *Me) error {
-	//TODO implement me
-	panic("implement me")
+	return nil
 }
 
 func (f *Follower) ToString() string {
