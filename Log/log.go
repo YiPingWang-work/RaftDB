@@ -108,110 +108,13 @@ func (l *Logs) Append(content Content) { // 幂等的增加日志
 	l.m.Unlock()
 }
 
-//func (l *Logs) GetContentByKeySlow(key LogKeyType) (LogType, error) { // 通过Key寻找指定日志，找不到返回空
-//	for i := 0; i < len(l.contents); i++ {
-//		if l.contents[i].LogKey.Equals(key) {
-//			return l.contents[i].Log, nil
-//		}
-//	}
-//	return LogType(""), errors.New("error: can not find this log by key")
-//}
-//
-//func (l *Logs) CommitSlow(key LogKeyType) (previousCommitted LogKeyType) { // 提交所有小于等于key的日志，幂等的提交日志
-//	previousCommitted = l.committedKey
-//	for i := len(l.contents) - 1; i >= 0; i-- {
-//		if !l.contents[i].LogKey.Greater(key) {
-//			if previousCommitted.Less(l.contents[i].LogKey) {
-//				l.committedKey = l.contents[i].LogKey
-//			}
-//			break
-//		}
-//	}
-//	return
-//}
-//
-//func (l *Logs) RemoveSlow(key LogKeyType) (removeLogKey LogKeyType, err error) { // 删除日志直到自己的日志Key不大于key
-//	removeLogKey, err = LogKeyType{Term: -1, Index: -1}, nil
-//	for i := len(l.contents) - 1; i >= 0; i-- {
-//		if !l.contents[i].LogKey.Greater(key) {
-//			if l.committedKey.Less(l.contents[i].LogKey) {
-//				removeLogKey = l.contents[i].LogKey
-//			} else {
-//				err = errors.New("error: remove committed log")
-//			}
-//			break
-//		}
-//	}
-//	if err == nil {
-//		for len(l.contents) >= 0 && !l.contents[len(l.contents)-1].LogKey.Equals(removeLogKey) {
-//			l.contents = l.contents[:len(l.contents)-1]
-//		}
-//	}
-//	return
-//}
-//
-//func (l *Logs) GetPreviousSlow(key LogKeyType) LogKeyType {
-//	for i := len(l.contents) - 1; i >= 1; i-- {
-//		if l.contents[i].LogKey.Equals(key) {
-//			return l.contents[i-1].LogKey
-//		}
-//	}
-//	return LogKeyType{Term: -1, Index: -1}
-//}
-//
-//func (l *Logs) GetNextSlow(key LogKeyType) LogKeyType {
-//	if key.Term == -1 && len(l.contents) > 0 {
-//		return l.contents[0].LogKey
-//	}
-//	for i := 0; i < len(l.contents)-1; i++ {
-//		if l.contents[i].LogKey.Equals(key) {
-//			return l.contents[i+1].LogKey
-//		}
-//	}
-//	return LogKeyType{Term: -1, Index: -1}
-//}
-//
-//func (l *Logs) GetLogsByRangeSlow(begin LogKeyType, end LogKeyType) []Content {
-//	l.m.RLock()
-//	fl, contents := false, []Content{}
-//	for i := 0; i < len(l.contents); i++ {
-//		if l.contents[i].LogKey.Equals(begin) {
-//			fl = true
-//		}
-//		if fl {
-//			contents = append(contents, l.contents[i])
-//		}
-//		if l.contents[i].LogKey.Equals(end) {
-//			fl = false
-//		}
-//	}
-//	l.m.RUnlock()
-//	return contents
-//}
-//
-//func (l *Logs) GetPreviousSlow(key LogKeyType) LogKeyType {
-//	res := LogKeyType{Term: -1, Index: -1}
-//	l.m.RLock()
-//	left, right := 0, len(l.contents)-1
-//	for left <= right {
-//		mid := (left + right) / 2
-//		if l.contents[mid].LogKey.Equals(key) {
-//			if mid >= 1 {
-//				res = l.contents[mid-1].LogKey
-//			}
-//			break
-//		} else if l.contents[mid].LogKey.Greater(key) {
-//			right = mid - 1
-//		} else {
-//			left = mid + 1
-//		}
-//	}
-//	l.m.RUnlock()
-//	return res
-//}
-
 func (l *Logs) GetPrevious(key LogKeyType) LogKeyType {
 	l.m.RLock()
+	res := LogKeyType{Term: -1, Index: -1}
+	if l.Iterator(key) == -1 {
+		l.m.Unlock()
+		return res
+	}
 	left, right := 0, len(l.contents)-1
 	for left < right {
 		mid := (left + right + 1) / 2
@@ -221,7 +124,6 @@ func (l *Logs) GetPrevious(key LogKeyType) LogKeyType {
 			left = mid
 		}
 	}
-	res := LogKeyType{Term: -1, Index: -1}
 	if l.contents[left].LogKey.Less(key) {
 		res = l.contents[left].LogKey
 	}
@@ -231,6 +133,11 @@ func (l *Logs) GetPrevious(key LogKeyType) LogKeyType {
 
 func (l *Logs) GetNext(key LogKeyType) LogKeyType {
 	l.m.RLock()
+	res := LogKeyType{Term: -1, Index: -1}
+	if l.Iterator(key) == -1 {
+		l.m.Unlock()
+		return res
+	}
 	left, right := 0, len(l.contents)-1
 	for left < right {
 		mid := (left + right) / 2
@@ -240,7 +147,6 @@ func (l *Logs) GetNext(key LogKeyType) LogKeyType {
 			left = mid + 1
 		}
 	}
-	res := LogKeyType{Term: -1, Index: -1}
 	if l.contents[left].LogKey.Greater(key) {
 		res = l.contents[left].LogKey
 	}
@@ -274,7 +180,7 @@ func (l *Logs) GetContentByKey(key LogKeyType) (LogType, error) { // 通过Key�
 }
 
 func (l *Logs) Commit(key LogKeyType) (previousCommitted LogKeyType) { // 提交所有小于等于key的日志，幂等的提交日志
-	l.m.RLock()
+	l.m.Lock()
 	previousCommitted = l.committedKey
 	left, right := 0, len(l.contents)-1
 	for left < right {
@@ -288,7 +194,7 @@ func (l *Logs) Commit(key LogKeyType) (previousCommitted LogKeyType) { // 提交
 	if !l.contents[left].LogKey.Greater(key) && previousCommitted.Less(l.contents[left].LogKey) {
 		l.committedKey = l.contents[left].LogKey
 	}
-	l.m.RUnlock()
+	l.m.Unlock()
 	return
 }
 
@@ -345,6 +251,22 @@ func (l *Logs) GetLogsByRange(begin LogKeyType, end LogKeyType) []Content { // �
 	} else {
 		tmp := make([]Content, endIter-beginIter+1)
 		copy(tmp, l.contents[beginIter:endIter+1])
+		l.m.RUnlock()
+		return tmp
+	}
+}
+
+func (l *Logs) GetKeysByRange(begin LogKeyType, end LogKeyType) []LogKeyType { // 返回 [begin, end]区间内的所有日志信息
+	l.m.RLock()
+	beginIter, endIter := l.Iterator(begin), l.Iterator(end)
+	if beginIter == -1 || endIter == -1 || beginIter > endIter {
+		l.m.RUnlock()
+		return []LogKeyType{}
+	} else {
+		tmp := make([]LogKeyType, endIter-beginIter+1)
+		for i := beginIter; i <= endIter; i++ {
+			tmp[i-beginIter] = l.contents[i].LogKey
+		}
 		l.m.RUnlock()
 		return tmp
 	}

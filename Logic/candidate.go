@@ -28,7 +28,7 @@ func (c *Candidate) processHeartbeat(msg Order.Msg, me *Me) error { // 收到同
 	return me.switchToFollower(msg.Term, true, msg)
 }
 
-func (c *Candidate) processRequest(msg Order.Msg, me *Me) error { // 收到同级日志请求，直接转化为follower
+func (c *Candidate) processAppendLog(msg Order.Msg, me *Me) error { // 收到同级日志请求，直接转化为follower
 	return me.switchToFollower(msg.Term, true, msg)
 }
 
@@ -36,12 +36,12 @@ func (c *Candidate) processCommit(msg Order.Msg, me *Me) error { // 收到同级
 	return me.switchToFollower(msg.Term, true, msg)
 }
 
-func (c *Candidate) processRequestReply(msg Order.Msg, me *Me) error {
+func (c *Candidate) processAppendLogReply(msg Order.Msg, me *Me) error {
 	return nil
 }
 
 func (c *Candidate) processVote(msg Order.Msg, me *Me) error { // 候选人不给任何同级的其他人投票
-	me.replyChan <- Order.Order{Type: Order.Send, Msg: Order.Msg{
+	me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Msg{
 		Type:  Order.VoteReply,
 		From:  me.meta.Id,
 		To:    []int{msg.From},
@@ -75,7 +75,7 @@ func (c *Candidate) processVoteReply(msg Order.Msg, me *Me) error {
 }
 
 func (c *Candidate) processPreVote(msg Order.Msg, me *Me) error {
-	me.replyChan <- Order.Order{Type: Order.Send, Msg: Order.Msg{
+	me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Msg{
 		Type: Order.PreVoteReply,
 		From: me.meta.Id,
 		To:   []int{msg.From},
@@ -91,13 +91,13 @@ func (c *Candidate) processPreVoteReply(msg Order.Msg, me *Me) error {
 			c.agree = map[int]bool{}
 			c.state = 1
 			log.Println("Candidate: begin vote after a random time")
-			me.timer = time.After(time.Duration(rand.Intn(20000)) * time.Millisecond)
+			me.timer = time.After(time.Duration(rand.Intn(100)) * time.Millisecond)
 		}
 	}
 	return nil
 }
 
-func (c *Candidate) processClient(req Log.LogType, me *Me) error {
+func (c *Candidate) processClient(msg Order.Msg, me *Me) error {
 	return errors.New("error: client --x-> candidate")
 }
 
@@ -116,7 +116,7 @@ func (c *Candidate) processTimeout(me *Me) error {
 		if metaTmp, err := json.Marshal(*me.meta); err != nil {
 			return err
 		} else {
-			me.replyChan <- Order.Order{Type: Order.Store, Msg: Order.Msg{Agree: true, Log: Log.LogType(string(metaTmp))}}
+			me.toBottomChan <- Order.Order{Type: Order.Store, Msg: Order.Msg{Agree: true, Log: Log.LogType(string(metaTmp))}}
 		}
 		reply.Type = Order.Vote
 		log.Printf("Candidate: voting ... , my term is %d\n", me.meta.Term)
@@ -125,8 +125,16 @@ func (c *Candidate) processTimeout(me *Me) error {
 		reply.Type = Order.PreVote
 	}
 	reply.Term = me.meta.Term
-	me.replyChan <- Order.Order{Type: Order.Send, Msg: reply}
+	me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: reply}
 	me.timer = time.After(me.candidatePreVoteTimeout)
+	return nil
+}
+
+func (c *Candidate) processExpansion(msg Order.Msg, me *Me) error {
+	return nil
+}
+
+func (c *Candidate) processExpansionReply(msg Order.Msg, me *Me) error {
 	return nil
 }
 

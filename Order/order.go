@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	Send OrderType = iota
+	NodeReply OrderType = iota
 	Store
 	ClientLicense
 	FromNode
@@ -25,7 +25,7 @@ type MsgType int
 type OrderType int
 
 var orderTypes []string = []string{
-	"Send",
+	"NodeReply",
 	"Store",
 	"ClientLicense",
 	"FromNode",
@@ -35,24 +35,28 @@ var orderTypes []string = []string{
 
 const (
 	Heartbeat MsgType = iota
-	Request
+	AppendLog
 	Commit
-	RequestReply
+	AppendLogReply
 	Vote
 	VoteReply
 	PreVote
 	PreVoteReply
+	Expansion
+	ExpansionReply
 )
 
 var msgTypes []string = []string{
 	"Heartbeat",
-	"Request",
+	"AppendLog",
 	"Commit",
-	"RequestReply",
+	"AppendLogReply",
 	"Vote",
 	"VoteReply",
 	"PreVote",
 	"PreVoteReply",
+	"Expansion",
+	"ExpansionReply",
 }
 
 type Msg struct {

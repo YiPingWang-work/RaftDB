@@ -16,8 +16,8 @@ type Me struct {
 	quorum                  int                // 最小选举人数
 	role                    Role               // 当前角色
 	timer                   <-chan time.Time   // 计时器
-	receiveChan             <-chan Order.Order // 接收bottom消息的管道
-	replyChan               chan<- Order.Order // 发送消息给bottom的管道
+	fromBottomChan          <-chan Order.Order // 接收bottom消息的管道
+	toBottomChan            chan<- Order.Order // 发送消息给bottom的管道
 	logs                    *Log.Logs          // 日志指针
 	leaderHeartbeat         time.Duration      // leader心跳间隔
 	followerTimeout         time.Duration      // follower超时时间
@@ -28,21 +28,23 @@ type Me struct {
 type Role interface {
 	init(me *Me) error
 	processHeartbeat(msg Order.Msg, me *Me) error
-	processRequest(msg Order.Msg, me *Me) error
-	processRequestReply(msg Order.Msg, me *Me) error
+	processAppendLog(msg Order.Msg, me *Me) error
+	processAppendLogReply(msg Order.Msg, me *Me) error
 	processCommit(msg Order.Msg, me *Me) error
 	processVote(msg Order.Msg, me *Me) error
 	processVoteReply(msg Order.Msg, me *Me) error
 	processPreVote(msg Order.Msg, me *Me) error
 	processPreVoteReply(msg Order.Msg, me *Me) error
-	processClient(req Log.LogType, me *Me) error
+	processExpansion(msg Order.Msg, me *Me) error      // 节点变更，未实现
+	processExpansionReply(msg Order.Msg, me *Me) error // 节点变更回复，未实现
+	processClient(msg Order.Msg, me *Me) error
 	processTimeout(me *Me) error
 	ToString() string
 }
 
-func (m *Me) Init(meta *Meta.Meta, logs *Log.Logs, receiveChan <-chan Order.Order, replyChan chan<- Order.Order) {
+func (m *Me) Init(meta *Meta.Meta, logs *Log.Logs, fromBottomChan <-chan Order.Order, toBottomChan chan<- Order.Order) {
 	m.meta, m.logs = meta, logs
-	m.receiveChan, m.replyChan = receiveChan, replyChan
+	m.fromBottomChan, m.toBottomChan = fromBottomChan, toBottomChan
 	m.members, m.quorum = make([]int, meta.Num), meta.Num/2
 	for i := 0; i < meta.Num; i++ {
 		m.members[i] = i
@@ -59,7 +61,7 @@ func (m *Me) Init(meta *Meta.Meta, logs *Log.Logs, receiveChan <-chan Order.Orde
 func (m *Me) Run() {
 	for {
 		select {
-		case order, ok := <-m.receiveChan: // 获取receiveChan管道的命令，bottom会往里面发送数据
+		case order, ok := <-m.fromBottomChan: // 获取receiveChan管道的命令，bottom会往里面发送数据
 			if !ok {
 				log.Println("Logic: Bye")
 				return
@@ -70,7 +72,7 @@ func (m *Me) Run() {
 				}
 			}
 			if order.Type == Order.FromClient { // 如果是客户端发送的数据
-				if err := m.role.processClient(order.Msg.Log, m); err != nil {
+				if err := m.role.processClient(order.Msg, m); err != nil {
 					log.Println(err)
 				}
 			}
@@ -91,10 +93,10 @@ func (m *Me) process(msg Order.Msg) error { // 所有状态处理其它节点消
 	switch msg.Type { // 处理不同类型的消息
 	case Order.Heartbeat:
 		return m.role.processHeartbeat(msg, m)
-	case Order.Request:
-		return m.role.processRequest(msg, m)
-	case Order.RequestReply:
-		return m.role.processRequestReply(msg, m)
+	case Order.AppendLog:
+		return m.role.processAppendLog(msg, m)
+	case Order.AppendLogReply:
+		return m.role.processAppendLogReply(msg, m)
 	case Order.Commit:
 		return m.role.processCommit(msg, m)
 	case Order.Vote:
@@ -117,11 +119,11 @@ func (m *Me) switchToFollower(term int, has bool, msg Order.Msg) error { // 切�
 		if metaTmp, err := json.Marshal(*m.meta); err != nil {
 			return err
 		} else {
-			m.replyChan <- Order.Order{Type: Order.Store, Msg: Order.Msg{Agree: true, Log: Log.LogType(string(metaTmp))}}
+			m.toBottomChan <- Order.Order{Type: Order.Store, Msg: Order.Msg{Agree: true, Log: Log.LogType(string(metaTmp))}}
 		}
 	}
 	m.role = &follower
-	m.replyChan <- Order.Order{Type: Order.ClientLicense, Msg: Order.Msg{Agree: false}} // 关闭发送许可
+	m.toBottomChan <- Order.Order{Type: Order.ClientLicense, Msg: Order.Msg{Agree: false}} // 关闭发送许可
 	if err := m.role.init(m); err != nil {
 		return err
 	}
@@ -135,7 +137,7 @@ func (m *Me) switchToFollower(term int, has bool, msg Order.Msg) error { // 切�
 func (m *Me) switchToLeader() error { // 切换为leader
 	log.Printf("==== switch to leader, my term is %d ====\n", m.meta.Term)
 	m.role = &leader
-	m.replyChan <- Order.Order{Type: Order.ClientLicense, Msg: Order.Msg{Agree: true}} // 开启发送许可
+	m.toBottomChan <- Order.Order{Type: Order.ClientLicense, Msg: Order.Msg{Agree: true}} // 开启发送许可
 	return m.role.init(m)
 }
 

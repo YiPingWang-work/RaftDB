@@ -6,15 +6,18 @@ import (
 	"math/rand"
 	"net"
 	"net/rpc"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
 type RPC struct {
 	clientLicence      bool
-	clientChan         chan bool
+	clientChans        sync.Map
 	replyChan          chan<- Order.Order
 	networkDelay       time.Duration
 	networkDelayRandom int
+	num                atomic.Int32
 }
 
 func (r *RPC) send(myAddr string, yourAddr string, msg Order.Msg) {
@@ -25,12 +28,15 @@ func (r *RPC) send(myAddr string, yourAddr string, msg Order.Msg) {
 	if err != nil {
 		return
 	}
+	defer client.Close()
 	time.Sleep(r.networkDelay)
-	_ = client.Call("RPC.Push", msg, nil)
+	if err = client.Call("RPC.Push", msg, nil); err != nil {
+		log.Println(err)
+	}
 }
 
 func (r *RPC) listenAndServe(myAddr string, replyChan chan<- Order.Order) error {
-	r.clientChan, r.replyChan = make(chan bool, 1000), replyChan
+	r.clientChans, r.replyChan = sync.Map{}, replyChan
 	r.changeNetworkDelay(0, 0)
 	r.changeClientLicence(false)
 	if err := rpc.RegisterName("RPC", r); err != nil {
@@ -62,8 +68,14 @@ func (r *RPC) changeNetworkDelay(delay int, random int) {
 	}
 }
 
-func (r *RPC) replyClient(st bool) {
-	r.clientChan <- st
+func (r *RPC) replyClient(msg Order.Msg) {
+	ch, ok := r.clientChans.Load(msg.To[0])
+	if ok {
+		select {
+		case ch.(chan Order.Msg) <- msg:
+		default:
+		}
+	}
 }
 
 func (r *RPC) Push(rec Order.Msg, rep *string) error {
@@ -72,12 +84,15 @@ func (r *RPC) Push(rec Order.Msg, rep *string) error {
 }
 
 func (r *RPC) Write(rec Order.Msg, rep *string) error {
-	r.replyChan <- Order.Order{Type: Order.FromClient, Msg: rec}
-	timer := time.After(time.Duration(rec.Term) * time.Millisecond)
 	if r.clientLicence {
+		rec.From = int(r.num.Add(1))
+		ch := make(chan Order.Msg, 0)
+		r.clientChans.Store(rec.From, ch)
+		r.replyChan <- Order.Order{Type: Order.FromClient, Msg: rec}
+		timer := time.After(time.Duration(rec.Term) * time.Millisecond)
 		select {
-		case ok := <-r.clientChan:
-			if ok {
+		case msg := <-ch:
+			if msg.Agree {
 				*rep = "ok"
 			} else {
 				*rep = "refuse"
@@ -85,8 +100,10 @@ func (r *RPC) Write(rec Order.Msg, rep *string) error {
 		case <-timer:
 			*rep = "timeout"
 		}
-	} else {
-		*rep = "client --x-> follower/candidate"
+		close(ch)
+		r.clientChans.Delete(rec.From)
+		return nil
 	}
+	*rep = "client --x-> follower/candidate"
 	return nil
 }
