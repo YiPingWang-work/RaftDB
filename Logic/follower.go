@@ -22,15 +22,17 @@ func (f *Follower) init(me *Me) error {
 
 func (f *Follower) processHeartbeat(msg Order.Msg, me *Me) error {
 	me.timer = time.After(me.followerTimeout)
+	log.Printf("Follower: leader %d's heartbeat\n", msg.From)
 	if !me.logs.GetLast().Equals(msg.LastLogKey) { // 如果在心跳过程中，发现自己的日志不是leader的最新日志，发送一个缺少消息，使用-1 -1 默认让leader发送自己最大的消息
 		log.Println("Follower: my logs are not complete")
 		me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Msg{
-			Type:       Order.AppendLogReply,
-			From:       me.meta.Id,
-			To:         []int{msg.From},
-			Term:       me.meta.Term,
-			Agree:      false,
-			LastLogKey: Log.LogKeyType{Term: -1, Index: -1},
+			Type:             Order.AppendLogReply,
+			From:             me.meta.Id,
+			To:               []int{msg.From},
+			Term:             me.meta.Term,
+			Agree:            false,
+			LastLogKey:       msg.LastLogKey,
+			SecondLastLogKey: me.logs.GetLast(),
 		}}
 	}
 	return nil
@@ -43,6 +45,9 @@ func (f *Follower) processAppendLog(msg Order.Msg, me *Me) error {
 		To:         []int{msg.From},
 		Term:       me.meta.Term,
 		LastLogKey: msg.LastLogKey,
+	}
+	if !me.logs.GetCommitted().Less(msg.LastLogKey) { // 如果你发来的消息的key我已经提交了，那么说明这是一个滞后的消息
+		return nil
 	}
 	if me.logs.GetLast().Greater(msg.SecondLastLogKey) { // leader发送一个比较小的消息，此时需要删除
 		if _, err := me.logs.Remove(msg.SecondLastLogKey); err != nil {
@@ -100,9 +105,9 @@ func (f *Follower) processVote(msg Order.Msg, me *Me) error {
 		Term: me.meta.Term,
 	}
 	if f.voted != -1 && f.voted != msg.From || me.logs.GetLast().Greater(msg.LastLogKey) { // 如果已经投过票了或者自己的最后一条日志数比它的大，不同意
-		reply.Agree = false
+		reply.Agree, reply.SecondLastLogKey = false, me.logs.GetLast()
 		log.Printf("Follower: refuse %d's vote, because vote: %d, myLastKey: %v, yourLastKey: %v\n",
-			msg.From, f.voted, me.logs.GetLast(), msg.LastLogKey)
+			msg.From, f.voted, reply.SecondLastLogKey, msg.LastLogKey)
 	} else {
 		f.voted = msg.From
 		reply.Agree = true

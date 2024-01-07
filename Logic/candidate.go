@@ -91,7 +91,7 @@ func (c *Candidate) processPreVoteReply(msg Order.Msg, me *Me) error {
 			c.agree = map[int]bool{}
 			c.state = 1
 			log.Println("Candidate: begin vote after a random time")
-			me.timer = time.After(time.Duration(rand.Intn(20000)) * time.Millisecond)
+			me.timer = time.After(time.Duration(rand.Intn(100000)) * time.Millisecond)
 		}
 	}
 	return nil

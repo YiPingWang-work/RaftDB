@@ -358,8 +358,8 @@ func (l *Logs) GetKeysByRange(begin LogKeyType, end LogKeyType) []LogKeyType { /
 		return []LogKeyType{}
 	} else {
 		tmp := make([]LogKeyType, endIter-beginIter+1)
-		for i := beginIter; i <= endIter+1; i++ {
-			tmp[i] = l.contents[i].LogKey
+		for i := beginIter; i <= endIter; i++ {
+			tmp[i-beginIter] = l.contents[i].LogKey
 		}
 		l.m.RUnlock()
 		return tmp

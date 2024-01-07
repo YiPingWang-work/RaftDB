@@ -20,7 +20,8 @@ type Leader struct {
 }
 
 func (l *Leader) init(me *Me) error {
-	l.agree, l.agreeAddNode, l.index = map[Log.LogKeyType]map[int]bool{}, map[string]map[int]bool{}, 0
+	l.agree, l.index = map[Log.LogKeyType]map[int]bool{}, 0
+	l.client, l.agreeAddNode = map[Log.LogKeyType]int{}, map[string]map[int]bool{}
 	return l.processTimeout(me)
 }
 
@@ -100,8 +101,8 @@ func (l *Leader) processAppendLogReply(msg Order.Msg, me *Me) error { // 处理�
 		}
 	} else { // 如果follower不同意我的请求，说明数据未对齐
 		newLastLogKey := me.logs.GetLast()
-		if msg.LastLogKey.Term != -1 {
-			newLastLogKey = me.logs.GetPrevious(msg.LastLogKey) // 尝试发送上一条
+		if msg.SecondLastLogKey.Less(newLastLogKey) {
+			newLastLogKey = me.logs.GetNext(msg.SecondLastLogKey) // 尝试发送上一条
 			log.Printf("Leader: %d refuse my request %v, his logs are not complete, send request %v\n",
 				msg.From, msg.LastLogKey, newLastLogKey)
 		} else {
