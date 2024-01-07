@@ -23,17 +23,9 @@ func (f *Follower) init(me *Me) error {
 func (f *Follower) processHeartbeat(msg Order.Msg, me *Me) error {
 	me.timer = time.After(me.followerTimeout)
 	log.Printf("Follower: leader %d's heartbeat\n", msg.From)
-	if !me.logs.GetLast().Equals(msg.LastLogKey) { // 如果在心跳过程中，发现自己的日志不是leader的最新日志，发送一个缺少消息，使用-1 -1 默认让leader发送自己最大的消息
+	if me.logs.GetLast().Less(msg.LastLogKey) { // 如果在心跳过程中，发现自己的日志不是leader的最新日志，则转到缺少日志处理，如果比较多在心跳的时候不管，等下一次同步新日志时处理
 		log.Println("Follower: my logs are not complete")
-		me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Msg{
-			Type:             Order.AppendLogReply,
-			From:             me.meta.Id,
-			To:               []int{msg.From},
-			Term:             me.meta.Term,
-			Agree:            false,
-			LastLogKey:       msg.LastLogKey,
-			SecondLastLogKey: me.logs.GetLast(),
-		}}
+		return f.processAppendLog(msg, me)
 	}
 	return nil
 }
@@ -46,24 +38,27 @@ func (f *Follower) processAppendLog(msg Order.Msg, me *Me) error {
 		Term:       me.meta.Term,
 		LastLogKey: msg.LastLogKey,
 	}
-	if !me.logs.GetCommitted().Less(msg.LastLogKey) { // 如果你发来的消息的key我已经提交了，那么说明这是一个滞后的消息
+	if !me.logs.GetCommitted().Less(msg.LastLogKey) { // 如果收到希望处理的日志比自己已提交的日志要小，不处理
 		return nil
 	}
-	if me.logs.GetLast().Greater(msg.SecondLastLogKey) { // leader发送一个比较小的消息，此时需要删除
-		if _, err := me.logs.Remove(msg.SecondLastLogKey); err != nil {
+	// 剩下的日志都是希望处理的日志大于自己已提交日志，也就是secondLast一定大于等于自己已提交的日志
+	if me.logs.GetLast().Greater(msg.SecondLastLogKey) { // 如果自己的日志比secondLast大，那么需要删除到自己日志的最后一条是secondLast
+		if _, err := me.logs.Remove(msg.SecondLastLogKey); err != nil { // 如果报错，则和上面的"也就是secondLast一定大于等于自己已提交的日志"冲突
 			return err
 		}
-		log.Printf("Follower: receive a less log %v from %d\n, remove logs until last log is %v\n",
-			msg.From, msg.SecondLastLogKey, me.logs.GetLast())
+		log.Printf("Follower: receive a less log %v from %d, remove logs until last log is %v\n",
+			msg.LastLogKey, msg.From, me.logs.GetLast())
 	}
-	if me.logs.GetLast().Equals(msg.SecondLastLogKey) { // 同意追加消息
+	// 到这里，自己的最后一条日志一定比secondLast小或者等于它
+	if me.logs.GetLast().Equals(msg.SecondLastLogKey) && msg.Type == Order.AppendLog { // 如果等于，并且日志中有信息，提交
 		reply.Agree = true
 		me.logs.Append(Log.Content{LogKey: msg.LastLogKey, Log: msg.Log})
 		log.Printf("Follower: accept %d's request %v\n", msg.From, msg.LastLogKey)
-	} else { // 还有别的消息没有到达，等待补全
-		reply.Agree = false
+	} else { // 如果没有或者msg中没有日志信息，则返回错误，提供自己反对提交msg.LastLogKey和自己的最后一条日志me.logs.GetLast
+		reply.Agree, reply.SecondLastLogKey = false, me.logs.GetLast()
 		log.Printf("Follower: refuse %d's request %v, my last log is %v\n", msg.From, msg.LastLogKey, me.logs.GetLast())
 	}
+	// 这里发出的自己的second一定是小于leader的最后一条日志的
 	me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: reply}
 	me.timer = time.After(me.followerTimeout)
 	return nil
@@ -78,6 +73,9 @@ func (f *Follower) processCommit(msg Order.Msg, me *Me) error {
 		return nil
 	}
 	previousCommitted := me.logs.Commit(msg.LastLogKey) // 直接提交之前的所有消息
+	if previousCommitted == me.logs.GetCommitted() {    // 如果它的提交消息是很大的，就不能提交
+		return nil
+	}
 	me.meta.CommittedKeyTerm, me.meta.CommittedKeyIndex = me.logs.GetCommitted().Term, me.logs.GetCommitted().Index
 	me.toBottomChan <- Order.Order{
 		Type: Order.Store,
@@ -89,7 +87,7 @@ func (f *Follower) processCommit(msg Order.Msg, me *Me) error {
 	if metaTmp, err := json.Marshal(*me.meta); err != nil {
 		return err
 	} else {
-		me.toBottomChan <- Order.Order{Type: Order.Store, Msg: Order.Msg{Agree: true, Log: Log.LogType(string(metaTmp))}}
+		me.toBottomChan <- Order.Order{Type: Order.Store, Msg: Order.Msg{Agree: true, Log: Log.LogType(metaTmp)}}
 	}
 	me.timer = time.After(me.followerTimeout)
 	log.Printf("Follower: commit logs whose key from %v to %v\n",

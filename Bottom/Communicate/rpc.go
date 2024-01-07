@@ -28,6 +28,7 @@ func (r *RPC) send(myAddr string, yourAddr string, msg Order.Msg) {
 	if err != nil {
 		return
 	}
+	defer client.Close()
 	time.Sleep(r.networkDelay)
 	if err = client.Call("RPC.Push", msg, nil); err != nil {
 		log.Println(err)
@@ -85,7 +86,6 @@ func (r *RPC) Push(rec Order.Msg, rep *string) error {
 func (r *RPC) Write(rec Order.Msg, rep *string) error {
 	if r.clientLicence {
 		rec.From = int(r.num.Add(1))
-		log.Print(rec.From)
 		ch := make(chan Order.Msg, 0)
 		r.clientChans.Store(rec.From, ch)
 		r.replyChan <- Order.Order{Type: Order.FromClient, Msg: rec}
