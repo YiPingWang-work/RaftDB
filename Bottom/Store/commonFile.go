@@ -37,7 +37,7 @@ func (c *CommonFile) loadFromCommitted(filePath string) error {
 	return nil
 }
 
-func (c *CommonFile) appendLog(filePath string, content string) error { // 在结尾处追加日志
+func (c *CommonFile) appendLog(filePath string, content string) error {
 	f, err := os.OpenFile(filePath, os.O_APPEND|os.O_WRONLY, 0777)
 	if err != nil {
 		return err
@@ -47,7 +47,7 @@ func (c *CommonFile) appendLog(filePath string, content string) error { // 在�
 	return err
 }
 
-func (c *CommonFile) popLog(filePath string) error { // 删除结尾处的日志
+func (c *CommonFile) popLog(filePath string) error {
 	f, err := os.OpenFile(filePath, os.O_RDWR, 0777)
 	if err != nil {
 		return err

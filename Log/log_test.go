@@ -17,6 +17,7 @@ func TestLogs(t *testing.T) {
 	logs.Append(Content{LogKeyType{2, 1}, LogType("2uuu}")})
 	logs.Append(Content{LogKeyType{4, 1}, LogType("2uuu}")})
 	log.Println(logs.GetKeysByRange(LogKeyType{0, 2}, LogKeyType{4, 1}))
+	logs.GetNext(LogKeyType{0, 1})
 	////log.Printf(logs.ToString())
 	////logs.Remove(LogKeyType{2, 2})
 	//log.Printf(logs.ToString())

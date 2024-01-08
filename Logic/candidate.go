@@ -24,15 +24,19 @@ func (c *Candidate) init(me *Me) error {
 	return c.processTimeout(me)
 }
 
-func (c *Candidate) processHeartbeat(msg Order.Msg, me *Me) error { // 收到同级心跳，直接转化为follower
+/*
+在收到同级心跳等leader发出的请求时，说明集群中还有leader存在，立即转变成follower后再处理这些请求。
+*/
+
+func (c *Candidate) processHeartbeat(msg Order.Msg, me *Me) error {
 	return me.switchToFollower(msg.Term, true, msg)
 }
 
-func (c *Candidate) processAppendLog(msg Order.Msg, me *Me) error { // 收到同级日志请求，直接转化为follower
+func (c *Candidate) processAppendLog(msg Order.Msg, me *Me) error {
 	return me.switchToFollower(msg.Term, true, msg)
 }
 
-func (c *Candidate) processCommit(msg Order.Msg, me *Me) error { // 收到同级日志确认，直接转化为follower
+func (c *Candidate) processCommit(msg Order.Msg, me *Me) error {
 	return me.switchToFollower(msg.Term, true, msg)
 }
 
@@ -40,7 +44,11 @@ func (c *Candidate) processAppendLogReply(msg Order.Msg, me *Me) error {
 	return nil
 }
 
-func (c *Candidate) processVote(msg Order.Msg, me *Me) error { // 候选人不给任何同级的其他人投票
+/*
+选举期间的candidate不会给同级的candidate选票
+*/
+
+func (c *Candidate) processVote(msg Order.Msg, me *Me) error {
 	me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Msg{
 		Type:  Order.VoteReply,
 		From:  me.meta.Id,
@@ -51,6 +59,10 @@ func (c *Candidate) processVote(msg Order.Msg, me *Me) error { // 候选人不�
 	log.Printf("Candidate: refuse %d's vote\n", msg.From)
 	return nil
 }
+
+/*
+如果选票同意人数达到quorum，则candidate晋升为leader，如果反对人数达到quorum，则candidate降级为follower。
+*/
 
 func (c *Candidate) processVoteReply(msg Order.Msg, me *Me) error {
 	log.Printf("Candidate: %d agree my vote: %v\n", msg.From, msg.Agree)
@@ -66,9 +78,9 @@ func (c *Candidate) processVoteReply(msg Order.Msg, me *Me) error {
 			}
 		}
 		if agreeNum >= me.quorum {
-			return me.switchToLeader() // 同意的人数多
+			return me.switchToLeader()
 		} else if disagreeNum >= me.quorum {
-			return me.switchToFollower(msg.Term, true, msg) // 不同意的人数多
+			return me.switchToFollower(msg.Term, true, msg)
 		}
 	}
 	return nil
@@ -84,8 +96,13 @@ func (c *Candidate) processPreVote(msg Order.Msg, me *Me) error {
 	return nil
 }
 
+/*
+如果预选举回复数达到quorum，说明集群属于存活态，自己有机会称为leader。
+随机一段时间后开始选举。
+*/
+
 func (c *Candidate) processPreVoteReply(msg Order.Msg, me *Me) error {
-	if c.state == 0 { // 如果现在处于预选举
+	if c.state == 0 {
 		c.agree[msg.From] = true
 		if len(c.agree) >= me.quorum {
 			c.agree = map[int]bool{}
@@ -101,6 +118,13 @@ func (c *Candidate) processClient(msg Order.Msg, me *Me) error {
 	return errors.New("error: client --x-> candidate")
 }
 
+/*
+三个阶段时间到期：
+如果处于预选举状态（0），说明此时集群不满足多数派存活，继续试探。
+如果是预选举到选举的随机时间结束到期，则自己开始正式选举。
+如果是正式选举到期，说明支持和反对的票都没到达quorum，考虑是否集群不够多数派，回到预选举阶段。
+*/
+
 func (c *Candidate) processTimeout(me *Me) error {
 	log.Printf("Candidate: timeout, state: %v\n", c.state)
 	reply := Order.Msg{
@@ -108,11 +132,11 @@ func (c *Candidate) processTimeout(me *Me) error {
 		To:         me.members,
 		LastLogKey: me.logs.GetLast(),
 	}
-	if c.state == 0 { // 如果还在预选举
+	if c.state == 0 {
 		reply.Type = Order.PreVote
-	} else if c.state == 1 { // 正式选举
-		me.meta.Term++ // 更新任期
-		c.state = 2    // 更新状态到正在选举中
+	} else if c.state == 1 {
+		me.meta.Term++
+		c.state = 2
 		if metaTmp, err := json.Marshal(*me.meta); err != nil {
 			return err
 		} else {
@@ -120,8 +144,8 @@ func (c *Candidate) processTimeout(me *Me) error {
 		}
 		reply.Type = Order.Vote
 		log.Printf("Candidate: voting ... , my term is %d\n", me.meta.Term)
-	} else { // 已经经过一轮选举了但是没有结果
-		c.state = 0 // 重新回到预选举
+	} else {
+		c.state = 0
 		reply.Type = Order.PreVote
 	}
 	reply.Term = me.meta.Term

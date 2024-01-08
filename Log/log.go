@@ -76,7 +76,7 @@ func (l *Logs) Init(committedKeyTerm int, committedKeyIndex int) {
 	l.committedKey = LogKeyType{Term: committedKeyTerm, Index: committedKeyIndex}
 }
 
-func (l *Logs) GetLast() LogKeyType { // 获取最后一笔日志Key
+func (l *Logs) GetLast() LogKeyType {
 	res := LogKeyType{Term: -1, Index: -1}
 	l.m.RLock()
 	if len(l.contents) >= 1 {
@@ -86,7 +86,7 @@ func (l *Logs) GetLast() LogKeyType { // 获取最后一笔日志Key
 	return res
 }
 
-func (l *Logs) GetSecondLast() LogKeyType { // 获取倒数第二笔日志Key
+func (l *Logs) GetSecondLast() LogKeyType {
 	res := LogKeyType{Term: -1, Index: -1}
 	l.m.RLock()
 	if len(l.contents) >= 2 {
@@ -96,7 +96,7 @@ func (l *Logs) GetSecondLast() LogKeyType { // 获取倒数第二笔日志Key
 	return res
 }
 
-func (l *Logs) GetCommitted() LogKeyType { // 获取最后一笔提交日志Key
+func (l *Logs) GetCommitted() LogKeyType {
 	return l.committedKey
 }
 
@@ -108,11 +108,11 @@ func (l *Logs) Append(content Content) { // 幂等的增加日志
 	l.m.Unlock()
 }
 
-func (l *Logs) GetPrevious(key LogKeyType) LogKeyType {
+func (l *Logs) GetPrevious(key LogKeyType) LogKeyType { // 如果key不存在，返回-1-1
 	l.m.RLock()
 	res := LogKeyType{Term: -1, Index: -1}
 	if l.Iterator(key) == -1 {
-		l.m.Unlock()
+		l.m.RUnlock()
 		return res
 	}
 	left, right := 0, len(l.contents)-1
@@ -131,11 +131,11 @@ func (l *Logs) GetPrevious(key LogKeyType) LogKeyType {
 	return res
 }
 
-func (l *Logs) GetNext(key LogKeyType) LogKeyType {
+func (l *Logs) GetNext(key LogKeyType) LogKeyType { // 如果key不存在，返回-1-1
 	l.m.RLock()
 	res := LogKeyType{Term: -1, Index: -1}
 	if l.Iterator(key) == -1 {
-		l.m.Unlock()
+		l.m.RUnlock()
 		return res
 	}
 	left, right := 0, len(l.contents)-1
@@ -242,7 +242,7 @@ func (l *Logs) Iterator(key LogKeyType) int { // 根据Key返回迭代器，没�
 	return -1
 }
 
-func (l *Logs) GetLogsByRange(begin LogKeyType, end LogKeyType) []Content { // 返回 [begin, end]区间内的所有日志信息
+func (l *Logs) GetLogsByRange(begin LogKeyType, end LogKeyType) []Content { // 返回 [begin, end]闭区间内的所有日志信息
 	l.m.RLock()
 	beginIter, endIter := l.Iterator(begin), l.Iterator(end)
 	if beginIter == -1 || endIter == -1 || beginIter > endIter {

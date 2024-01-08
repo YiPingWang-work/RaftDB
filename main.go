@@ -27,7 +27,7 @@ func gogo(confPath string, filePath string) {
 	rand.Seed(time.Now().UnixNano() + int64(meta.Id)%1024)                   // 设置随机因子
 	log.Printf("\n%s\n", meta.ToString())                                    // 输出元数据信息
 	log.Printf("\n%s\n", logs.ToString())                                    // 输出日志信息
-	me.Init(&meta, &logs, ToLogicChan, ToBottomChan)                         // 初始化Raft层，raft层和bottom可以共享访问log，但是meta只有Raft层可以访问
+	me.Init(&meta, &logs, ToLogicChan, ToBottomChan, nil, nil)               // 初始化Raft层，raft层和bottom可以共享访问log，但是meta只有Raft层可以访问
 	go bottom.Run()                                                          // 运行底座，运行网络监听，开始对接端口Msg.ToLogicChan, Order.ReplyChan监听
 	go Monitor.Monitor(&me, &logs, &bottom)                                  // 开启监控程序，三个参数均是只读参数，其中meta会永久的保留在me中，通过me唯一访问
 	me.Run()                                                                 // 运行逻辑层，开始对接端口Msg.ToLogicChan, Order.ReplyChan监听
