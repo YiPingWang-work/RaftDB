@@ -3,6 +3,7 @@ package Logic
 import (
 	"RaftDB/Log"
 	"RaftDB/Order"
+	"RaftDB/Something"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,10 +14,13 @@ import (
 var leader Leader
 
 type Leader struct {
-	agree        map[Log.LogKeyType]map[int]bool // 对于哪条记录，同意的follower集合
-	client       map[Log.LogKeyType]int          // 对应agree的是哪个client发出的
-	agreeAddNode map[string]map[int]bool         // 对于某次节点变更，同意的follower集合
-	index        int                             // 当前日志的index
+	agreeMap map[Log.LogKey]fc // 对于哪条记录，同意的follower集合和这个消息来自哪个client
+	index    int               // 当前日志的index
+}
+
+type fc struct {
+	followers map[int]bool
+	client    int
 }
 
 /*
@@ -24,21 +28,20 @@ type Leader struct {
 */
 
 func (l *Leader) init(me *Me) error {
-	l.agree, l.index = map[Log.LogKeyType]map[int]bool{}, 0
-	l.client, l.agreeAddNode = map[Log.LogKeyType]int{}, map[string]map[int]bool{}
+	l.agreeMap, l.index = map[Log.LogKey]fc{}, 0
 	return l.processTimeout(me)
 }
 
-func (l *Leader) processHeartbeat(msg Order.Msg, me *Me) error {
+func (l *Leader) processHeartbeat(msg Order.Message, me *Me) error {
 	return errors.New("error: maybe two leaders")
 }
 
-func (l *Leader) processAppendLog(msg Order.Msg, me *Me) error {
+func (l *Leader) processAppendLog(msg Order.Message, me *Me) error {
 	return errors.New("error: maybe two leaders")
 }
 
-func (l *Leader) processAppendLogReply(msg Order.Msg, me *Me) error {
-	reply := Order.Msg{
+func (l *Leader) processAppendLogReply(msg Order.Message, me *Me) error {
+	reply := Order.Message{
 		Type:       Order.Commit,
 		From:       me.meta.Id,
 		To:         []int{},
@@ -64,29 +67,24 @@ func (l *Leader) processAppendLogReply(msg Order.Msg, me *Me) error {
 				回复客户端数据提交成功。
 				同时广播，让各个follower提交该日志。
 			*/
-			l.agree[msg.LastLogKey][msg.From] = true
-			if len(l.agree[msg.LastLogKey]) >= me.quorum && me.meta.Term == msg.LastLogKey.Term {
+			l.agreeMap[msg.LastLogKey].followers[msg.From] = true
+			if len(l.agreeMap[msg.LastLogKey].followers) >= me.quorum && me.meta.Term == msg.LastLogKey.Term {
 				me.meta.CommittedKeyTerm, me.meta.CommittedKeyIndex = msg.LastLogKey.Term, msg.LastLogKey.Index
 				if metaTmp, err := json.Marshal(*me.meta); err != nil {
 					return err
 				} else {
-					me.toBottomChan <- Order.Order{Type: Order.Store, Msg: Order.Msg{Agree: true, Log: Log.LogType(metaTmp)}}
+					me.toBottomChan <- Order.Order{Type: Order.Store, Msg: Order.Message{Agree: true, Log: string(metaTmp)}}
 				}
 				previousCommitted := me.logs.Commit(msg.LastLogKey)
 				secondLastKey := me.logs.GetNext(previousCommitted)
-				me.toBottomChan <- Order.Order{Type: Order.Store, Msg: Order.Msg{
+				me.toBottomChan <- Order.Order{Type: Order.Store, Msg: Order.Message{
 					Agree:            false,
 					LastLogKey:       msg.LastLogKey,
 					SecondLastLogKey: secondLastKey,
 				}}
 				for _, v := range me.logs.GetKeysByRange(secondLastKey, msg.LastLogKey) {
-					me.toBottomChan <- Order.Order{Type: Order.ClientReply, Msg: Order.Msg{
-						From:  me.meta.Id,
-						To:    []int{l.client[v]},
-						Agree: true,
-					}}
-					delete(l.client, v)
-					delete(l.agree, v)
+					me.clientSyncFinishedChan <- l.agreeMap[v].client
+					delete(l.agreeMap, v)
 				}
 				reply.To = me.members
 				me.timer = time.After(me.leaderHeartbeat)
@@ -102,7 +100,7 @@ func (l *Leader) processAppendLogReply(msg Order.Msg, me *Me) error {
 			if err != nil {
 				return err
 			}
-			me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Msg{
+			me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Message{
 				Type:             Order.AppendLog,
 				From:             reply.From,
 				To:               []int{msg.From},
@@ -138,42 +136,45 @@ func (l *Leader) processAppendLogReply(msg Order.Msg, me *Me) error {
 	return nil
 }
 
-func (l *Leader) processCommit(msg Order.Msg, me *Me) error {
+func (l *Leader) processCommit(msg Order.Message, me *Me) error {
 	return errors.New("error: maybe two leaders")
 }
 
-func (l *Leader) processVote(msg Order.Msg, me *Me) error {
+func (l *Leader) processVote(msg Order.Message, me *Me) error {
 	return l.processTimeout(me)
 }
 
-func (l *Leader) processVoteReply(msg Order.Msg, me *Me) error {
+func (l *Leader) processVoteReply(msg Order.Message, me *Me) error {
 	return nil
 }
 
-func (l *Leader) processPreVote(msg Order.Msg, me *Me) error {
+func (l *Leader) processPreVote(msg Order.Message, me *Me) error {
 	return l.processTimeout(me)
 }
 
-func (l *Leader) processPreVoteReply(msg Order.Msg, me *Me) error {
+func (l *Leader) processPreVoteReply(msg Order.Message, me *Me) error {
 	return nil
 }
 
-/*
-收到客户端的写请求，更新内存中的日志，更新自己的LastLogKey，初始化选举设置和客户端回复。
-广播日志追加请求。
-*/
+func (l *Leader) processFromClient(msg Order.Message, me *Me) error {
+	if msg.Agree {
+		me.clientSyncMap[msg.From] = clientSync{msg: msg}
+	}
+	me.toCrownChan <- Something.Something{Id: msg.From, NeedReply: true, Content: msg.Log}
+	return nil
+}
 
-func (l *Leader) processClient(msg Order.Msg, me *Me) error {
+func (l *Leader) processClientSync(msg Order.Message, me *Me) error {
 	secondLastKey := me.logs.GetLast()
-	lastLogKey := Log.LogKeyType{Term: me.meta.Term, Index: l.index}
-	me.logs.Append(Log.Content{LogKey: lastLogKey, Log: msg.Log})
-	l.agree[lastLogKey] = map[int]bool{}
-	l.client[lastLogKey] = msg.From
-	me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Msg{
+	lastLogKey := Log.LogKey{Term: me.meta.Term, Index: l.index}
+	me.logs.Append(Log.LogContent{Key: lastLogKey, Log: msg.Log})
+	l.agreeMap[lastLogKey] = fc{followers: map[int]bool{}, client: msg.From}
+	me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Message{
 		Type:             Order.AppendLog,
 		From:             me.meta.Id,
 		To:               me.members,
 		Term:             me.meta.Term,
+		Agree:            false,
 		LastLogKey:       lastLogKey,
 		SecondLastLogKey: secondLastKey,
 		Log:              msg.Log,
@@ -185,7 +186,7 @@ func (l *Leader) processClient(msg Order.Msg, me *Me) error {
 }
 
 func (l *Leader) processTimeout(me *Me) error {
-	me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Msg{
+	me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Message{
 		Type:             Order.Heartbeat,
 		From:             me.meta.Id,
 		To:               me.members,
@@ -198,19 +199,19 @@ func (l *Leader) processTimeout(me *Me) error {
 	return nil
 }
 
-func (l *Leader) processExpansion(msg Order.Msg, me *Me) error {
+func (l *Leader) processExpansion(msg Order.Message, me *Me) error {
 	return nil
 }
 
-func (l *Leader) processExpansionReply(msg Order.Msg, me *Me) error {
+func (l *Leader) processExpansionReply(msg Order.Message, me *Me) error {
 	return nil
 }
 
 func (l *Leader) ToString() string {
 	res := fmt.Sprintf("==== LEADER ====\nindex: %d\nagreedReply:\n", l.index)
-	for k, v := range l.agree {
-		s := fmt.Sprintf("	key: {%d %d} -> ", k.Term, k.Index)
-		for k2, _ := range v {
+	for k, v := range l.agreeMap {
+		s := fmt.Sprintf("	from: %d, key: {%d %d} -> ", v.client, k.Term, k.Index)
+		for k2, _ := range v.followers {
 			s += fmt.Sprintf("%d ", k2)
 		}
 		res += s + "\n"

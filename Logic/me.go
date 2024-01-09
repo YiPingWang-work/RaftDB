@@ -4,6 +4,7 @@ import (
 	"RaftDB/Log"
 	"RaftDB/Meta"
 	"RaftDB/Order"
+	"RaftDB/Something"
 	"encoding/json"
 	"errors"
 	"log"
@@ -11,20 +12,26 @@ import (
 )
 
 type Me struct {
-	meta                    *Meta.Meta         // 元数据信息指针，用于状态变更，只允许Logic层修改元数据信息
-	members                 []int              // 维护的成员数量
-	quorum                  int                // 最小选举人数
-	role                    Role               // 当前角色
-	timer                   <-chan time.Time   // 计时器
-	fromBottomChan          <-chan Order.Order // 接收bottom消息的管道
-	toBottomChan            chan<- Order.Order // 发送消息给bottom的管道
-	fromCrownChan           <-chan interface{} // 上层接口
-	ToCrownChan             chan<- interface{} // 上层接口
-	logs                    *Log.Logs          // 日志指针
-	leaderHeartbeat         time.Duration      // leader心跳间隔
-	followerTimeout         time.Duration      // follower超时时间
-	candidatePreVoteTimeout time.Duration      // candidate预选举超时
-	candidateVoteTimeout    time.Duration      // candidate选举超时
+	meta                    *Meta.Meta                 // 元数据信息指针，用于状态变更，只允许Logic层修改元数据信息
+	members                 []int                      // 维护的成员数量
+	quorum                  int                        // 最小选举人数
+	role                    Role                       // 当前角色
+	timer                   <-chan time.Time           // 计时器
+	fromBottomChan          <-chan Order.Order         // 接收bottom消息的管道
+	toBottomChan            chan<- Order.Order         // 发送消息给bottom的管道
+	fromCrownChan           <-chan Something.Something // 上层接口
+	toCrownChan             chan<- Something.Something // 上层接口
+	clientSyncFinishedChan  chan int                   // 客户端同步处理完成通知
+	clientSyncMap           map[int]clientSync         // 如果是需要大多数follower进行同步的消息，表示是否同步完成
+	logs                    *Log.Logs                  // 日志指针
+	leaderHeartbeat         time.Duration              // leader心跳间隔
+	followerTimeout         time.Duration              // follower超时时间
+	candidatePreVoteTimeout time.Duration              // candidate预选举超时
+	candidateVoteTimeout    time.Duration              // candidate选举超时
+}
+
+type clientSync struct {
+	msg Order.Message
 }
 
 /*
@@ -34,17 +41,18 @@ Role接口定义了处理各种消息的函数，Follower、Leader、Candidate�
 
 type Role interface {
 	init(me *Me) error
-	processHeartbeat(msg Order.Msg, me *Me) error
-	processAppendLog(msg Order.Msg, me *Me) error
-	processAppendLogReply(msg Order.Msg, me *Me) error
-	processCommit(msg Order.Msg, me *Me) error
-	processVote(msg Order.Msg, me *Me) error
-	processVoteReply(msg Order.Msg, me *Me) error
-	processPreVote(msg Order.Msg, me *Me) error
-	processPreVoteReply(msg Order.Msg, me *Me) error
-	processExpansion(msg Order.Msg, me *Me) error      // 节点变更，未实现
-	processExpansionReply(msg Order.Msg, me *Me) error // 节点变更回复，未实现
-	processClient(msg Order.Msg, me *Me) error
+	processHeartbeat(msg Order.Message, me *Me) error
+	processAppendLog(msg Order.Message, me *Me) error
+	processAppendLogReply(msg Order.Message, me *Me) error
+	processCommit(msg Order.Message, me *Me) error
+	processVote(msg Order.Message, me *Me) error
+	processVoteReply(msg Order.Message, me *Me) error
+	processPreVote(msg Order.Message, me *Me) error
+	processPreVoteReply(msg Order.Message, me *Me) error
+	processExpansion(msg Order.Message, me *Me) error      // 节点变更，未实现
+	processExpansionReply(msg Order.Message, me *Me) error // 节点变更回复，未实现
+	processFromClient(msg Order.Message, me *Me) error
+	processClientSync(msg Order.Message, me *Me) error
 	processTimeout(me *Me) error
 	ToString() string
 }
@@ -54,10 +62,12 @@ type Role interface {
 */
 
 func (m *Me) Init(meta *Meta.Meta, logs *Log.Logs,
-	fromBottomChan <-chan Order.Order, toBottomChan chan<- Order.Order, fromCrownChan <-chan interface{}, toCrownChan chan<- interface{}) {
+	fromBottomChan <-chan Order.Order, toBottomChan chan<- Order.Order,
+	fromCrownChan chan Something.Something, toCrownChan chan<- Something.Something) {
 	m.meta, m.logs = meta, logs
 	m.fromBottomChan, m.toBottomChan = fromBottomChan, toBottomChan
-	m.fromCrownChan, m.ToCrownChan = fromCrownChan, toCrownChan
+	m.fromCrownChan, m.toCrownChan = fromCrownChan, toCrownChan
+	m.clientSyncFinishedChan = make(chan int, 100000)
 	m.members, m.quorum = make([]int, meta.Num), meta.Num/2
 	for i := 0; i < meta.Num; i++ {
 		m.members[i] = i
@@ -66,7 +76,7 @@ func (m *Me) Init(meta *Meta.Meta, logs *Log.Logs,
 	m.followerTimeout = time.Duration(meta.FollowerTimeout) * time.Millisecond
 	m.candidateVoteTimeout = time.Duration(meta.CandidateVoteTimeout) * time.Millisecond
 	m.candidatePreVoteTimeout = time.Duration(meta.CandidatePreVoteTimeout) * time.Millisecond
-	if err := m.switchToFollower(m.meta.Term, false, Order.Msg{}); err != nil {
+	if err := m.switchToFollower(m.meta.Term, false, Order.Message{}); err != nil {
 		log.Println(err)
 	}
 }
@@ -81,37 +91,71 @@ Logic层的主体函数，不断获取来自bottom的消息和定时器超时的
 func (m *Me) Run() {
 	for {
 		select {
-		case order, ok := <-m.fromBottomChan:
-			if !ok {
-				log.Println("Logic: Bye")
+		case order, opened := <-m.fromBottomChan:
+			if !opened {
+				log.Println("error: bottom chan is closed")
 				return
 			}
 			if order.Type == Order.FromNode {
-				if err := m.process(order.Msg); err != nil {
+				if err := m.processFromNode(order.Msg); err != nil {
 					log.Println(err)
 				}
 			}
 			if order.Type == Order.FromClient {
-				if err := m.role.processClient(order.Msg, m); err != nil {
+				if err := m.role.processFromClient(order.Msg, m); err != nil {
 					log.Println(err)
+					m.toBottomChan <- Order.Order{Type: Order.ClientReply,
+						Msg: Order.Message{From: order.Msg.From, Log: "refuse to operate"}}
 				}
 			}
 		case <-m.timer:
 			if err := m.role.processTimeout(m); err != nil {
 				log.Println(err)
 			}
+		case sth, opened := <-m.fromCrownChan:
+			if !opened {
+				log.Println("error: crown chan is closed")
+			}
+			id := sth.Id
+			if !sth.Agree {
+				m.toBottomChan <- Order.Order{Type: Order.ClientReply,
+					Msg: Order.Message{From: id, Log: "app think it is a bad operation"}}
+				delete(m.clientSyncMap, id)
+				continue
+			}
+			if csp, has := m.clientSyncMap[id]; has {
+				if err := m.role.processClientSync(csp.msg, m); err != nil {
+					log.Println(err)
+					m.toBottomChan <- Order.Order{Type: Order.ClientReply,
+						Msg: Order.Message{From: id, Log: "operated but refuse to sync"}}
+					delete(m.clientSyncMap, id)
+				} else {
+					m.clientSyncMap[id] = clientSync{msg: Order.Message{From: id, Log: sth.Content}}
+
+				}
+			} else {
+				m.toBottomChan <- Order.Order{Type: Order.ClientReply, Msg: Order.Message{From: id, Log: sth.Content}}
+			}
+		case id, opened := <-m.clientSyncFinishedChan:
+			if !opened {
+				log.Println("error: me.clientSyncFinishedChan closed")
+			}
+			if csp, has := m.clientSyncMap[id]; has {
+				m.toBottomChan <- Order.Order{Type: Order.ClientReply, Msg: csp.msg}
+			}
+			delete(m.clientSyncMap, id)
 		}
 	}
 }
 
 /*
-process方法是处理OrderType为FromNode所有命令中msg的共同逻辑。
+processFromNode方法是处理OrderType为FromNode所有命令中msg的共同逻辑。
 首先会进行消息Term判断，如果发现收到了一则比自己Term大的消息，会转成follower之后继续处理这个消息。
 如果发现消息的Term比自己小，说明是一个过期的消息，不予处理。
 之后会根据消息的Type分类处理。
 */
 
-func (m *Me) process(msg Order.Msg) error {
+func (m *Me) processFromNode(msg Order.Message) error {
 	if m.meta.Term > msg.Term || m.meta.Id == msg.From {
 		return nil
 	} else if m.meta.Term < msg.Term {
@@ -141,26 +185,26 @@ func (m *Me) process(msg Order.Msg) error {
 
 /*
 切换为follower，如果还有余下的消息没处理按照follower逻辑处理这些消息。
-当切换为Follower的时候，会关闭客户端权限，也就是通知bottom禁止客户端连接。
+当切换为Follower的时候，会开启客户端权限，也就是通知bottom允许客户端连接。
 */
 
-func (m *Me) switchToFollower(term int, has bool, msg Order.Msg) error {
+func (m *Me) switchToFollower(term int, has bool, msg Order.Message) error {
 	log.Printf("==== switch to follower, my term is %d, has remain msg to process: %v ====\n", term, has)
 	if m.meta.Term < term {
 		m.meta.Term = term
 		if metaTmp, err := json.Marshal(*m.meta); err != nil {
 			return err
 		} else {
-			m.toBottomChan <- Order.Order{Type: Order.Store, Msg: Order.Msg{Agree: true, Log: Log.LogType(metaTmp)}}
+			m.toBottomChan <- Order.Order{Type: Order.Store, Msg: Order.Message{Agree: true, Log: string(metaTmp)}}
 		}
 	}
 	m.role = &follower
-	m.toBottomChan <- Order.Order{Type: Order.ClientLicense, Msg: Order.Msg{Agree: false}}
+	m.clientSyncMap = map[int]clientSync{}
 	if err := m.role.init(m); err != nil {
 		return err
 	}
 	if has {
-		return m.process(msg)
+		return m.processFromNode(msg)
 	} else {
 		return nil
 	}
@@ -174,17 +218,19 @@ func (m *Me) switchToFollower(term int, has bool, msg Order.Msg) error {
 func (m *Me) switchToLeader() error {
 	log.Printf("==== switch to leader, my term is %d ====\n", m.meta.Term)
 	m.role = &leader
-	m.toBottomChan <- Order.Order{Type: Order.ClientLicense, Msg: Order.Msg{Agree: true}} // 开启发送许可
+	m.clientSyncMap = map[int]clientSync{}
 	return m.role.init(m)
 }
 
 /*
-切换为candidate
+切换为candidate。
+当切换为Follower的时候，会关闭客户端权限，也就是通知bottom禁止客户端连接。
 */
 
 func (m *Me) switchToCandidate() error {
 	log.Printf("==== switch to candidate, my term is %d ====\n", m.meta.Term)
 	m.role = &candidate
+	m.clientSyncMap = map[int]clientSync{}
 	return m.role.init(m)
 }
 

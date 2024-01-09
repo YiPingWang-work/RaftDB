@@ -3,6 +3,7 @@ package Logic
 import (
 	"RaftDB/Log"
 	"RaftDB/Order"
+	"RaftDB/Something"
 	"encoding/json"
 	"errors"
 	"log"
@@ -26,7 +27,7 @@ func (f *Follower) init(me *Me) error {
 这里如果自己的日志比leader大，不做处理，等到新消息到来时再删除。
 */
 
-func (f *Follower) processHeartbeat(msg Order.Msg, me *Me) error {
+func (f *Follower) processHeartbeat(msg Order.Message, me *Me) error {
 	me.timer = time.After(me.followerTimeout)
 	log.Printf("Follower: leader %d's heartbeat\n", msg.From)
 	if me.logs.GetLast().Less(msg.LastLogKey) {
@@ -46,8 +47,8 @@ func (f *Follower) processHeartbeat(msg Order.Msg, me *Me) error {
 所有经过此函数发出的不同意的回复必须保证SecondLastLogKey小于发送过来的LastLogKey。
 */
 
-func (f *Follower) processAppendLog(msg Order.Msg, me *Me) error {
-	reply := Order.Msg{
+func (f *Follower) processAppendLog(msg Order.Message, me *Me) error {
+	reply := Order.Message{
 		Type:       Order.AppendLogReply,
 		From:       me.meta.Id,
 		To:         []int{msg.From},
@@ -58,15 +59,20 @@ func (f *Follower) processAppendLog(msg Order.Msg, me *Me) error {
 		return nil
 	}
 	if me.logs.GetLast().Greater(msg.SecondLastLogKey) {
-		if _, err := me.logs.Remove(msg.SecondLastLogKey); err != nil { // 如果报错，则和上面的"也就是secondLast一定大于等于自己已提交的日志"冲突
+		if contents, err := me.logs.Remove(msg.SecondLastLogKey); err != nil { // 如果报错，则和上面的"也就是secondLast一定大于等于自己已提交的日志"冲突
 			return err
+		} else {
+			for _, v := range contents {
+				me.toCrownChan <- Something.Something{NeedReply: false, Content: "!" + v.Log}
+			}
 		}
 		log.Printf("Follower: receive a less log %v from %d, remove logs until last log is %v\n",
 			msg.LastLogKey, msg.From, me.logs.GetLast())
 	}
 	if me.logs.GetLast().Equals(msg.SecondLastLogKey) && msg.Type == Order.AppendLog {
 		reply.Agree = true
-		me.logs.Append(Log.Content{LogKey: msg.LastLogKey, Log: msg.Log})
+		me.logs.Append(Log.LogContent{Key: msg.LastLogKey, Log: msg.Log})
+		me.toCrownChan <- Something.Something{NeedReply: false, Content: msg.Log}
 		log.Printf("Follower: accept %d's request %v\n", msg.From, msg.LastLogKey)
 	} else {
 		reply.Agree, reply.SecondLastLogKey = false, me.logs.GetLast()
@@ -77,7 +83,7 @@ func (f *Follower) processAppendLog(msg Order.Msg, me *Me) error {
 	return nil
 }
 
-func (f *Follower) processAppendLogReply(msg Order.Msg, me *Me) error {
+func (f *Follower) processAppendLogReply(msg Order.Message, me *Me) error {
 	return nil
 }
 
@@ -85,7 +91,7 @@ func (f *Follower) processAppendLogReply(msg Order.Msg, me *Me) error {
 follower将提交所有小于等于提交请求key的log。
 */
 
-func (f *Follower) processCommit(msg Order.Msg, me *Me) error {
+func (f *Follower) processCommit(msg Order.Message, me *Me) error {
 	if !me.logs.GetCommitted().Less(msg.LastLogKey) {
 		return nil
 	}
@@ -97,11 +103,11 @@ func (f *Follower) processCommit(msg Order.Msg, me *Me) error {
 	if metaTmp, err := json.Marshal(*me.meta); err != nil {
 		return err
 	} else {
-		me.toBottomChan <- Order.Order{Type: Order.Store, Msg: Order.Msg{Agree: true, Log: Log.LogType(metaTmp)}}
+		me.toBottomChan <- Order.Order{Type: Order.Store, Msg: Order.Message{Agree: true, Log: string(metaTmp)}}
 	}
 	me.toBottomChan <- Order.Order{
 		Type: Order.Store,
-		Msg: Order.Msg{
+		Msg: Order.Message{
 			Agree:            false,
 			LastLogKey:       me.logs.GetCommitted(),
 			SecondLastLogKey: me.logs.GetNext(previousCommitted),
@@ -116,8 +122,8 @@ func (f *Follower) processCommit(msg Order.Msg, me *Me) error {
 处理投票回复，如果follower在本轮（Term）已经投过票了或者自己的LastLogKey比Candidate大，那么他将拒绝，否则同意。
 */
 
-func (f *Follower) processVote(msg Order.Msg, me *Me) error {
-	reply := Order.Msg{
+func (f *Follower) processVote(msg Order.Message, me *Me) error {
+	reply := Order.Message{
 		Type: Order.VoteReply,
 		From: me.meta.Id,
 		To:   []int{msg.From},
@@ -130,7 +136,7 @@ func (f *Follower) processVote(msg Order.Msg, me *Me) error {
 	} else {
 		f.voted = msg.From
 		reply.Agree = true
-		log.Printf("Follower: agree %d's vote\n", msg.From)
+		log.Printf("Follower: agreeMap %d's vote\n", msg.From)
 	}
 	me.toBottomChan <- Order.Order{
 		Type: Order.NodeReply,
@@ -139,12 +145,12 @@ func (f *Follower) processVote(msg Order.Msg, me *Me) error {
 	return nil
 }
 
-func (f *Follower) processVoteReply(msg Order.Msg, me *Me) error {
+func (f *Follower) processVoteReply(msg Order.Message, me *Me) error {
 	return nil
 }
 
-func (f *Follower) processPreVote(msg Order.Msg, me *Me) error {
-	me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Msg{
+func (f *Follower) processPreVote(msg Order.Message, me *Me) error {
+	me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Message{
 		Type: Order.PreVoteReply,
 		From: me.meta.Id,
 		To:   []int{msg.From},
@@ -153,12 +159,20 @@ func (f *Follower) processPreVote(msg Order.Msg, me *Me) error {
 	return nil
 }
 
-func (f *Follower) processPreVoteReply(msg Order.Msg, me *Me) error {
+func (f *Follower) processPreVoteReply(msg Order.Message, me *Me) error {
 	return nil
 }
 
-func (f *Follower) processClient(msg Order.Msg, me *Me) error {
-	return errors.New("error: client --x-> follower")
+func (f *Follower) processFromClient(msg Order.Message, me *Me) error {
+	if msg.Agree {
+		return errors.New("error: follower can not do sync")
+	}
+	me.toCrownChan <- Something.Something{Id: msg.From, NeedReply: true, Content: msg.Log}
+	return nil
+}
+
+func (f *Follower) processClientSync(msg Order.Message, me *Me) error {
+	return errors.New("error: follower can not do sync")
 }
 
 func (f *Follower) processTimeout(me *Me) error {
@@ -166,11 +180,11 @@ func (f *Follower) processTimeout(me *Me) error {
 	return me.switchToCandidate()
 }
 
-func (f *Follower) processExpansion(msg Order.Msg, me *Me) error {
+func (f *Follower) processExpansion(msg Order.Message, me *Me) error {
 	return nil
 }
 
-func (f *Follower) processExpansionReply(msg Order.Msg, me *Me) error {
+func (f *Follower) processExpansionReply(msg Order.Message, me *Me) error {
 	return nil
 }
 

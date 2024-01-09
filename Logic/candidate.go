@@ -1,7 +1,6 @@
 package Logic
 
 import (
-	"RaftDB/Log"
 	"RaftDB/Order"
 	"encoding/json"
 	"errors"
@@ -28,19 +27,19 @@ func (c *Candidate) init(me *Me) error {
 在收到同级心跳等leader发出的请求时，说明集群中还有leader存在，立即转变成follower后再处理这些请求。
 */
 
-func (c *Candidate) processHeartbeat(msg Order.Msg, me *Me) error {
+func (c *Candidate) processHeartbeat(msg Order.Message, me *Me) error {
 	return me.switchToFollower(msg.Term, true, msg)
 }
 
-func (c *Candidate) processAppendLog(msg Order.Msg, me *Me) error {
+func (c *Candidate) processAppendLog(msg Order.Message, me *Me) error {
 	return me.switchToFollower(msg.Term, true, msg)
 }
 
-func (c *Candidate) processCommit(msg Order.Msg, me *Me) error {
+func (c *Candidate) processCommit(msg Order.Message, me *Me) error {
 	return me.switchToFollower(msg.Term, true, msg)
 }
 
-func (c *Candidate) processAppendLogReply(msg Order.Msg, me *Me) error {
+func (c *Candidate) processAppendLogReply(msg Order.Message, me *Me) error {
 	return nil
 }
 
@@ -48,8 +47,8 @@ func (c *Candidate) processAppendLogReply(msg Order.Msg, me *Me) error {
 选举期间的candidate不会给同级的candidate选票
 */
 
-func (c *Candidate) processVote(msg Order.Msg, me *Me) error {
-	me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Msg{
+func (c *Candidate) processVote(msg Order.Message, me *Me) error {
+	me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Message{
 		Type:  Order.VoteReply,
 		From:  me.meta.Id,
 		To:    []int{msg.From},
@@ -64,8 +63,8 @@ func (c *Candidate) processVote(msg Order.Msg, me *Me) error {
 如果选票同意人数达到quorum，则candidate晋升为leader，如果反对人数达到quorum，则candidate降级为follower。
 */
 
-func (c *Candidate) processVoteReply(msg Order.Msg, me *Me) error {
-	log.Printf("Candidate: %d agree my vote: %v\n", msg.From, msg.Agree)
+func (c *Candidate) processVoteReply(msg Order.Message, me *Me) error {
+	log.Printf("Candidate: %d agreeMap my vote: %v\n", msg.From, msg.Agree)
 	agreeNum := 0
 	disagreeNum := 0
 	c.agree[msg.From] = msg.Agree
@@ -86,8 +85,8 @@ func (c *Candidate) processVoteReply(msg Order.Msg, me *Me) error {
 	return nil
 }
 
-func (c *Candidate) processPreVote(msg Order.Msg, me *Me) error {
-	me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Msg{
+func (c *Candidate) processPreVote(msg Order.Message, me *Me) error {
+	me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Message{
 		Type: Order.PreVoteReply,
 		From: me.meta.Id,
 		To:   []int{msg.From},
@@ -101,7 +100,7 @@ func (c *Candidate) processPreVote(msg Order.Msg, me *Me) error {
 随机一段时间后开始选举。
 */
 
-func (c *Candidate) processPreVoteReply(msg Order.Msg, me *Me) error {
+func (c *Candidate) processPreVoteReply(msg Order.Message, me *Me) error {
 	if c.state == 0 {
 		c.agree[msg.From] = true
 		if len(c.agree) >= me.quorum {
@@ -114,8 +113,12 @@ func (c *Candidate) processPreVoteReply(msg Order.Msg, me *Me) error {
 	return nil
 }
 
-func (c *Candidate) processClient(msg Order.Msg, me *Me) error {
-	return errors.New("error: client --x-> candidate")
+func (c *Candidate) processFromClient(msg Order.Message, me *Me) error {
+	return errors.New("error: candidate can not do sync")
+}
+
+func (c *Candidate) processClientSync(msg Order.Message, me *Me) error {
+	return errors.New("error: candidate can not do sync")
 }
 
 /*
@@ -127,7 +130,7 @@ func (c *Candidate) processClient(msg Order.Msg, me *Me) error {
 
 func (c *Candidate) processTimeout(me *Me) error {
 	log.Printf("Candidate: timeout, state: %v\n", c.state)
-	reply := Order.Msg{
+	reply := Order.Message{
 		From:       me.meta.Id,
 		To:         me.members,
 		LastLogKey: me.logs.GetLast(),
@@ -140,7 +143,7 @@ func (c *Candidate) processTimeout(me *Me) error {
 		if metaTmp, err := json.Marshal(*me.meta); err != nil {
 			return err
 		} else {
-			me.toBottomChan <- Order.Order{Type: Order.Store, Msg: Order.Msg{Agree: true, Log: Log.LogType(string(metaTmp))}}
+			me.toBottomChan <- Order.Order{Type: Order.Store, Msg: Order.Message{Agree: true, Log: string(metaTmp)}}
 		}
 		reply.Type = Order.Vote
 		log.Printf("Candidate: voting ... , my term is %d\n", me.meta.Term)
@@ -154,16 +157,16 @@ func (c *Candidate) processTimeout(me *Me) error {
 	return nil
 }
 
-func (c *Candidate) processExpansion(msg Order.Msg, me *Me) error {
+func (c *Candidate) processExpansion(msg Order.Message, me *Me) error {
 	return nil
 }
 
-func (c *Candidate) processExpansionReply(msg Order.Msg, me *Me) error {
+func (c *Candidate) processExpansionReply(msg Order.Message, me *Me) error {
 	return nil
 }
 
 func (c *Candidate) ToString() string {
-	res := fmt.Sprintf("==== CANDIDATE ====\nstate: %v\nagree:\n", c.state)
+	res := fmt.Sprintf("==== CANDIDATE ====\nstate: %v\nagreeMap:\n", c.state)
 	for k, v := range c.agree {
 		res += fmt.Sprintf("%d:%v ", k, v)
 	}

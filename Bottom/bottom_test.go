@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestStore(t *testing.T) {
+func TestBottom(t *testing.T) {
 	meta := Meta.Meta{}
 	logs := Log.Logs{}
 	logs.Init(-1, -1)
@@ -22,12 +22,12 @@ func TestStore(t *testing.T) {
 		}
 	}
 	log.Println(logs)
-	logs.Append(Log.Content{LogKey: Log.LogKeyType{Index: 1, Term: 0}, Log: Log.LogType("10")})
-	logs.Append(Log.Content{LogKey: Log.LogKeyType{Index: 1, Term: 1}, Log: Log.LogType("11")})
-	logs.Append(Log.Content{LogKey: Log.LogKeyType{Index: 1, Term: 2}, Log: Log.LogType("21")})
-	logs.Append(Log.Content{LogKey: Log.LogKeyType{Index: 1, Term: 0}, Log: Log.LogType("10i")})
+	logs.Append(Log.LogContent{Key: Log.LogKey{Index: 1, Term: 0}, Log: "10"})
+	logs.Append(Log.LogContent{Key: Log.LogKey{Index: 1, Term: 1}, Log: "11"})
+	logs.Append(Log.LogContent{Key: Log.LogKey{Index: 1, Term: 2}, Log: "21"})
+	logs.Append(Log.LogContent{Key: Log.LogKey{Index: 1, Term: 0}, Log: "10i"})
 	log.Println(logs)
-	for _, v := range logs.GetLogsByRange(Log.LogKeyType{Index: 0, Term: 0}, Log.LogKeyType{Index: 1, Term: 2}) {
+	for _, v := range logs.GetLogsByRange(Log.LogKey{Index: 0, Term: 0}, Log.LogKey{Index: 1, Term: 2}) {
 		log.Println(v)
 		if err := store.AppendLog(Log.LogToString(v)); err != nil {
 			log.Println(err)
