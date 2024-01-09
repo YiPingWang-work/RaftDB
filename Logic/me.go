@@ -120,7 +120,9 @@ func (m *Me) Run() {
 			if !sth.Agree {
 				m.toBottomChan <- Order.Order{Type: Order.ClientReply,
 					Msg: Order.Message{From: id, Log: "app think it is a bad operation"}}
-				delete(m.clientSyncMap, id)
+				if _, has := m.clientSyncMap[id]; has {
+					delete(m.clientSyncMap, id)
+				}
 				continue
 			}
 			if csp, has := m.clientSyncMap[id]; has {
