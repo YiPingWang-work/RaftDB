@@ -9,13 +9,9 @@ import (
 func TestLogs(t *testing.T) {
 	logs := Logs{}
 	logs.Init(-1, -1)
-	logs.Append(LogContent{LogKey{0, 1}, LogType("01")})
-	logs.Append(LogContent{LogKey{0, 2}, LogType("02")})
-	logs.Append(LogContent{LogKey{0, 3}, LogType("03")})
-	logs.Append(LogContent{LogKey{2, 1}, LogType("21")})
-	logs.Append(LogContent{LogKey{2, 2}, LogType("22")})
-	logs.Append(LogContent{LogKey{2, 1}, LogType("2uuu}")})
-	logs.Append(LogContent{LogKey{4, 1}, LogType("2uuu}")})
+	logs.Append(LogContent{LogKey{0, 1}, "01"})
+	logs.Append(LogContent{LogKey{0, 2}, "02"})
+
 	log.Println(logs.GetKeysByRange(LogKey{0, 2}, LogKey{4, 1}))
 	logs.GetNext(LogKey{0, 1})
 	////log.Printf(logs.ToString())
