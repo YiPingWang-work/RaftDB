@@ -2,6 +2,7 @@ package Logic
 
 import (
 	"RaftDB/Order"
+	"RaftDB/Something"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -114,7 +115,11 @@ func (c *Candidate) processPreVoteReply(msg Order.Message, me *Me) error {
 }
 
 func (c *Candidate) processFromClient(msg Order.Message, me *Me) error {
-	return errors.New("error: candidate can not do sync")
+	if msg.Agree {
+		return errors.New("error: candidate refuses to sync")
+	}
+	me.toCrownChan <- Something.Something{Id: msg.From, NeedReply: true, Content: msg.Log}
+	return nil
 }
 
 func (c *Candidate) processClientSync(msg Order.Message, me *Me) error {

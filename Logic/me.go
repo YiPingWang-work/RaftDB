@@ -22,7 +22,7 @@ type Me struct {
 	fromCrownChan           <-chan Something.Something // 上层接口
 	toCrownChan             chan<- Something.Something // 上层接口
 	clientSyncFinishedChan  chan int                   // 客户端同步处理完成通知
-	clientSyncMap           map[int]clientSync         // 如果是需要大多数follower进行同步的消息，表示是否同步完成
+	clientSyncMap           map[int]clientSync         // clientSyncMap只会保存leader在本轮任期内需要同步的消息
 	logs                    *Log.Logs                  // 日志指针
 	leaderHeartbeat         time.Duration              // leader心跳间隔
 	followerTimeout         time.Duration              // follower超时时间
@@ -103,9 +103,13 @@ func (m *Me) Run() {
 			}
 			if order.Type == Order.FromClient {
 				if err := m.role.processFromClient(order.Msg, m); err != nil {
+					/*
+						如果处理客户端请求失败，立即回复客户端，并且这个请求被Logic层拦截，不会有后续处理。
+						很可能client把同步请求发送给了follower
+					*/
 					log.Println(err)
 					m.toBottomChan <- Order.Order{Type: Order.ClientReply,
-						Msg: Order.Message{From: order.Msg.From, Log: "refuse to operate"}}
+						Msg: Order.Message{From: order.Msg.From, Log: "logic refuses to operate"}}
 				}
 			}
 		case <-m.timer:
@@ -118,34 +122,52 @@ func (m *Me) Run() {
 			}
 			id := sth.Id
 			if !sth.Agree {
+				/*
+					如果Crown层返回不允许执行，则说明客户端的指令有问题,会把错误信息报告回客户端。
+					Logic对其拦截，不会有后续处理，如果是同步请求，释放Logic层为其分配的资源。
+				*/
 				m.toBottomChan <- Order.Order{Type: Order.ClientReply,
-					Msg: Order.Message{From: id, Log: "app think it is a bad operation"}}
+					Msg: Order.Message{From: id, Log: sth.Content}}
 				if _, has := m.clientSyncMap[id]; has {
 					delete(m.clientSyncMap, id)
 				}
 				continue
 			}
+			/*
+				如果这是一个同步请求并且在同步消息映射表中还能找i得到，同时当前的角色是leader，说明这是一个当前leader处理的同时是需要同步的消息，则进行同步处理。
+				如果这是一个单一请求，则直接返回客户端消息.
+				否则这是一个过期的需要同步的请求，但资源已经被销毁，应给是历史请求，新一轮的me给出相应的错误响应。
+			*/
 			if csp, has := m.clientSyncMap[id]; has {
 				if err := m.role.processClientSync(csp.msg, m); err != nil {
 					log.Println(err)
-					m.toBottomChan <- Order.Order{Type: Order.ClientReply,
-						Msg: Order.Message{From: id, Log: "operated but refuse to sync"}}
 					delete(m.clientSyncMap, id)
 				} else {
 					m.clientSyncMap[id] = clientSync{msg: Order.Message{From: id, Log: sth.Content}}
-
+					continue
 				}
-			} else {
+			} else if !sth.NeedSync {
 				m.toBottomChan <- Order.Order{Type: Order.ClientReply, Msg: Order.Message{From: id, Log: sth.Content}}
+				continue
+			} else {
+				log.Println("error: leader can not sync")
 			}
+			m.toBottomChan <- Order.Order{Type: Order.ClientReply,
+				Msg: Order.Message{From: id, Log: "operated but logic refuses to sync"}}
 		case id, opened := <-m.clientSyncFinishedChan:
 			if !opened {
 				log.Println("error: me.clientSyncFinishedChan closed")
 			}
+			/*
+				说明本条消息同步成功，但如果此时me进入新一轮，则不知道回复是什么，但是会告诉客户端成功执行，只不过不知道crown的回复。
+			*/
 			if csp, has := m.clientSyncMap[id]; has {
 				m.toBottomChan <- Order.Order{Type: Order.ClientReply, Msg: csp.msg}
+				delete(m.clientSyncMap, id)
+			} else {
+				m.toBottomChan <- Order.Order{Type: Order.ClientReply,
+					Msg: Order.Message{From: id, Log: "operated and synced but don't know result"}}
 			}
-			delete(m.clientSyncMap, id)
 		}
 	}
 }
@@ -201,7 +223,6 @@ func (m *Me) switchToFollower(term int, has bool, msg Order.Message) error {
 		}
 	}
 	m.role = &follower
-	m.clientSyncMap = map[int]clientSync{}
 	if err := m.role.init(m); err != nil {
 		return err
 	}
@@ -215,6 +236,7 @@ func (m *Me) switchToFollower(term int, has bool, msg Order.Message) error {
 /*
 切换为leader。
 当切换为leader的时候会开启客户端权限，也就是通知bottom可以接受客户端的连接请求。
+新一轮的leader会重置自己的clientSyncMap。
 */
 
 func (m *Me) switchToLeader() error {
@@ -232,7 +254,6 @@ func (m *Me) switchToLeader() error {
 func (m *Me) switchToCandidate() error {
 	log.Printf("==== switch to candidate, my term is %d ====\n", m.meta.Term)
 	m.role = &candidate
-	m.clientSyncMap = map[int]clientSync{}
 	return m.role.init(m)
 }
 

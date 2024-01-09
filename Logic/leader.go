@@ -160,7 +160,7 @@ func (l *Leader) processFromClient(msg Order.Message, me *Me) error {
 	if msg.Agree {
 		me.clientSyncMap[msg.From] = clientSync{msg: msg}
 	}
-	me.toCrownChan <- Something.Something{Id: msg.From, NeedReply: true, Content: msg.Log}
+	me.toCrownChan <- Something.Something{Id: msg.From, NeedReply: true, NeedSync: msg.Agree, Content: msg.Log}
 	return nil
 }
 

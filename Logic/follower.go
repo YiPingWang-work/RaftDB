@@ -165,9 +165,9 @@ func (f *Follower) processPreVoteReply(msg Order.Message, me *Me) error {
 
 func (f *Follower) processFromClient(msg Order.Message, me *Me) error {
 	if msg.Agree {
-		return errors.New("error: follower can not do sync")
+		return errors.New("error: follower refuses to sync")
 	}
-	me.toCrownChan <- Something.Something{Id: msg.From, NeedReply: true, Content: msg.Log}
+	me.toCrownChan <- Something.Something{Id: msg.From, NeedReply: true, NeedSync: false, Content: msg.Log}
 	return nil
 }
 
