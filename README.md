@@ -203,4 +203,7 @@ db.conf文件示例：
 
 4.集中测试
 
+### 使用说明
+现阶段稳定版本是Expansion分支，addKV是在Expansion的基础上增加kv数据库功能（Crown层（应用层）），作者正在调试编写
+
 ​	
