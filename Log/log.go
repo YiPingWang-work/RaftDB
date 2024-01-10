@@ -134,6 +134,10 @@ func (l *Logs) GetPrevious(key LogKeyType) LogKeyType { // 如果key不存在，
 func (l *Logs) GetNext(key LogKeyType) LogKeyType { // 如果key不存在，返回-1-1
 	l.m.RLock()
 	res := LogKeyType{Term: -1, Index: -1}
+	if key.Equals(LogKeyType{-1, -1}) && len(l.contents) > 0 {
+		l.m.RUnlock()
+		return l.contents[0].LogKey
+	}
 	if l.Iterator(key) == -1 {
 		l.m.RUnlock()
 		return res
