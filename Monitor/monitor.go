@@ -1,10 +1,10 @@
 package Monitor
 
 import (
-	"RaftDB/Bottom"
-	"RaftDB/Crown"
-	"RaftDB/Log"
-	"RaftDB/Logic"
+	"RaftDB/Kernel/Bottom"
+	"RaftDB/Kernel/Crown"
+	"RaftDB/Kernel/Log"
+	"RaftDB/Kernel/Logic"
 	"fmt"
 	"strconv"
 	"strings"
@@ -30,7 +30,7 @@ func Monitor(me *Logic.Me, logs *Log.Logs, bottom *Bottom.Bottom, crown *Crown.C
 				if err == nil {
 					random, err := strconv.Atoi(tmp[2])
 					if err == nil {
-						bottom.ChangeNetworkDelay(delay, random)
+						bottom.ChangeNetworkDelay(delay, random != 0)
 						fmt.Println("network delay changed")
 						continue
 					}

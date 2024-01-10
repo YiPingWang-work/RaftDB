@@ -34,7 +34,7 @@ func (k *KVDB) Init() {
 func (k *KVDB) Process(in string) (out string, agree bool, err error) {
 	log.Printf("KVDB: process: %s\n", in)
 	if x, legal := k.parser(in); !legal {
-		return "illegal operation", false, nil
+		return "db: illegal operation", false, nil
 	} else {
 		if x.opType == read {
 			if res, ok := k.datas[x.data.key]; ok {
@@ -57,7 +57,6 @@ func (k *KVDB) UndoProcess(in string) (out string, agree bool, err error) {
 
 func (k *KVDB) parser(order string) (op, bool) {
 	res := strings.SplitN(order, " ", 3)
-	log.Println(res)
 	if res[0] == "read" {
 		return op{opType: read, data: kvData{key: res[1]}}, true
 	} else if res[0] == "write" {

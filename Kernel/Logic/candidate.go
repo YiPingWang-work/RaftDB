@@ -1,8 +1,8 @@
 package Logic
 
 import (
-	"RaftDB/Order"
-	"RaftDB/Something"
+	"RaftDB/Kernel/Pipe/Order"
+	"RaftDB/Kernel/Pipe/Something"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -65,7 +65,7 @@ func (c *Candidate) processVote(msg Order.Message, me *Me) error {
 */
 
 func (c *Candidate) processVoteReply(msg Order.Message, me *Me) error {
-	log.Printf("Candidate: %d agreeMap my vote: %v\n", msg.From, msg.Agree)
+	log.Printf("Candidate: %d agree my vote: %v\n", msg.From, msg.Agree)
 	agreeNum := 0
 	disagreeNum := 0
 	c.agree[msg.From] = msg.Agree

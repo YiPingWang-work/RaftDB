@@ -1,9 +1,9 @@
 package Logic
 
 import (
-	"RaftDB/Log"
-	"RaftDB/Order"
-	"RaftDB/Something"
+	"RaftDB/Kernel/Log"
+	"RaftDB/Kernel/Pipe/Order"
+	"RaftDB/Kernel/Pipe/Something"
 	"encoding/json"
 	"errors"
 	"fmt"

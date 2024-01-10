@@ -1,14 +1,16 @@
 package main
 
 import (
-	"RaftDB/Bottom"
-	"RaftDB/Crown"
-	"RaftDB/Log"
-	"RaftDB/Logic"
-	"RaftDB/Meta"
+	"RaftDB/Custom/Communicate/RPC"
+	"RaftDB/Custom/Store/Commenfile"
+	"RaftDB/Kernel/Bottom"
+	"RaftDB/Kernel/Crown"
+	"RaftDB/Kernel/Log"
+	"RaftDB/Kernel/Logic"
+	"RaftDB/Kernel/Meta"
+	"RaftDB/Kernel/Pipe/Order"
+	"RaftDB/Kernel/Pipe/Something"
 	"RaftDB/Monitor"
-	"RaftDB/Order"
-	"RaftDB/Something"
 	"log"
 	"math/rand"
 	"os"
@@ -19,16 +21,18 @@ import (
 type MemberType int
 
 func gogo(confPath string, filePath string) {
-	var bottom Bottom.Bottom                                                        // 声明通信和存储底座，内部数据结构线程不安全
-	var meta Meta.Meta                                                              // 新建元数据，元数据线程不安全
-	var logs Log.Logs                                                               // 新建日志文件，日志文件线程安全
-	var me Logic.Me                                                                 // 新建Raft层，内部数据结构线程不安全
-	var crown Crown.Crown                                                           // 新建上层应用服务
-	fromBottomChan := make(chan Order.Order, 100000)                                // 创建下层通讯管道，管道线程安全
-	toBottomChan := make(chan Order.Order, 100000)                                  // 创建下层通讯管道，管道线程安全
-	toCrownChan := make(chan Something.Something, 100000)                           // 创建上层管道
-	fromCrownChan := make(chan Something.Something, 100000)                         // 创建上层通讯管道
-	bottom.Init(confPath, filePath, &meta, &logs, toBottomChan, fromBottomChan)     // 初始化系统底座，初始化meta和logs(传出参数)
+	var bottom Bottom.Bottom                               // 声明通信和存储底座，内部数据结构线程不安全
+	var meta Meta.Meta                                     // 新建元数据，元数据线程不安全
+	var logs Log.Logs                                      // 新建日志文件，日志文件线程安全
+	var me Logic.Me                                        // 新建Raft层，内部数据结构线程不安全
+	var crown Crown.Crown                                  // 新建上层应用服务
+	fromBottomChan := make(chan Order.Order, 10000)        // 创建下层通讯管道，管道线程安全
+	toBottomChan := make(chan Order.Order, 10000)          // 创建下层通讯管道，管道线程安全
+	toCrownChan := make(chan Something.Something, 10000)   // 创建上层管道
+	fromCrownChan := make(chan Something.Something, 10000) // 创建上层通讯管道
+	bottom.Init(confPath, filePath, &meta, &logs,
+		&Commenfile.CommonFile{}, &RPC.RPC{}, toBottomChan, fromBottomChan,
+		nil, fromBottomChan) // 初始化系统底座，初始化meta和logs(传出参数)
 	rand.Seed(time.Now().UnixNano() + int64(meta.Id)%1024)                          // 设置随机因子
 	log.Printf("\n%s\n", meta.ToString())                                           // 输出元数据信息
 	log.Printf("\n%s\n", logs.ToString())                                           // 输出日志信息

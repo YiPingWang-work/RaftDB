@@ -1,8 +1,8 @@
 package Crown
 
 import (
-	"RaftDB/Crown/KVDB"
-	"RaftDB/Something"
+	"RaftDB/Custom/DB/KVDB"
+	"RaftDB/Kernel/Pipe/Something"
 	"log"
 )
 
