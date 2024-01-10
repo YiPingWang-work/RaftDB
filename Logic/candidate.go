@@ -115,6 +115,7 @@ func (c *Candidate) processPreVoteReply(msg Order.Message, me *Me) error {
 }
 
 func (c *Candidate) processFromClient(msg Order.Message, me *Me) error {
+	log.Printf("Candidate: a msg from client: %v\n", msg)
 	if msg.Agree {
 		return errors.New("error: candidate refuses to sync")
 	}

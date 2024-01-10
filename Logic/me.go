@@ -63,7 +63,7 @@ type Role interface {
 
 func (m *Me) Init(meta *Meta.Meta, logs *Log.Logs,
 	fromBottomChan <-chan Order.Order, toBottomChan chan<- Order.Order,
-	fromCrownChan chan Something.Something, toCrownChan chan<- Something.Something) {
+	fromCrownChan <-chan Something.Something, toCrownChan chan<- Something.Something) {
 	m.meta, m.logs = meta, logs
 	m.fromBottomChan, m.toBottomChan = fromBottomChan, toBottomChan
 	m.fromCrownChan, m.toCrownChan = fromCrownChan, toCrownChan

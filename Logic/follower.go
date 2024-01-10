@@ -164,6 +164,7 @@ func (f *Follower) processPreVoteReply(msg Order.Message, me *Me) error {
 }
 
 func (f *Follower) processFromClient(msg Order.Message, me *Me) error {
+	log.Printf("Follower: a msg from client: %v\n", msg)
 	if msg.Agree {
 		return errors.New("error: follower refuses to sync")
 	}

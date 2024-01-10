@@ -157,6 +157,7 @@ func (l *Leader) processPreVoteReply(msg Order.Message, me *Me) error {
 }
 
 func (l *Leader) processFromClient(msg Order.Message, me *Me) error {
+	log.Printf("Leader: a msg from client: %v\n", msg)
 	if msg.Agree {
 		me.clientSyncMap[msg.From] = clientSync{msg: msg}
 	}

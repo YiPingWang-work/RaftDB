@@ -2,6 +2,7 @@ package Monitor
 
 import (
 	"RaftDB/Bottom"
+	"RaftDB/Crown"
 	"RaftDB/Log"
 	"RaftDB/Logic"
 	"fmt"
@@ -9,7 +10,7 @@ import (
 	"strings"
 )
 
-func Monitor(me *Logic.Me, logs *Log.Logs, bottom *Bottom.Bottom) { // 禁止修改参数
+func Monitor(me *Logic.Me, logs *Log.Logs, bottom *Bottom.Bottom, crown *Crown.Crown) { // 禁止修改参数
 	for {
 		var x string
 		fmt.Scanln(&x)
@@ -18,6 +19,9 @@ func Monitor(me *Logic.Me, logs *Log.Logs, bottom *Bottom.Bottom) { // 禁止修
 			continue
 		} else if x == "log" {
 			fmt.Println(logs.ToString())
+			continue
+		} else if x == "crown" {
+			fmt.Println(crown.ToString())
 			continue
 		} else {
 			tmp := strings.Split(x, ",")

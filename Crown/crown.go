@@ -1,6 +1,7 @@
 package Crown
 
 import (
+	"RaftDB/Crown/KVDB"
 	"RaftDB/Something"
 	"log"
 )
@@ -20,10 +21,14 @@ type Crown struct {
 type App interface {
 	Process(in string) (out string, agreeNext bool, err error)
 	UndoProcess(in string) (out string, agreeNext bool, err error) // 处理逆信息
+	Init()
+	ToString() string
 }
 
-func (c *Crown) Init(toLogicChan chan<- Something.Something, fromLogicChan <-chan Something.Something) {
+func (c *Crown) Init(fromLogicChan <-chan Something.Something, toLogicChan chan<- Something.Something) {
 	c.toLogicChan, c.fromLogicChan = toLogicChan, fromLogicChan
+	c.app = &KVDB.KVDB{}
+	c.app.Init()
 }
 
 func (c *Crown) Run() {
@@ -52,4 +57,8 @@ func (c *Crown) Run() {
 			}
 		}
 	}
+}
+
+func (c *Crown) ToString() string {
+	return c.app.ToString()
 }

@@ -24,14 +24,15 @@ type op struct {
 	data   kvData
 }
 
-type kvdb struct {
+type KVDB struct {
 	datas map[string]string
 }
 
-func (k *kvdb) Init() {
+func (k *KVDB) Init() {
 	k.datas = map[string]string{}
 }
-func (k *kvdb) Process(in string) (out string, agree bool, err error) {
+func (k *KVDB) Process(in string) (out string, agree bool, err error) {
+	log.Printf("KVDB: process: %s\n", in)
 	if x, legal := k.parser(in); !legal {
 		return "illegal operation", false, nil
 	} else {
@@ -49,12 +50,12 @@ func (k *kvdb) Process(in string) (out string, agree bool, err error) {
 	return in, false, nil
 }
 
-func (k *kvdb) UndoProcess(in string) (out string, agree bool, err error) {
+func (k *KVDB) UndoProcess(in string) (out string, agree bool, err error) {
 	fmt.Printf("============================== !!%s\n", in)
 	return in, true, nil
 }
 
-func (k *kvdb) parser(order string) (op, bool) {
+func (k *KVDB) parser(order string) (op, bool) {
 	res := strings.SplitN(order, " ", 3)
 	log.Println(res)
 	if res[0] == "read" {
@@ -64,6 +65,14 @@ func (k *kvdb) parser(order string) (op, bool) {
 	} else {
 		return op{}, false
 	}
+}
+
+func (k *KVDB) ToString() string {
+	u := "kvdb: "
+	for i, v := range k.datas {
+		u += fmt.Sprintf("\nk: %s v: %s", i, v)
+	}
+	return u
 }
 
 // 需要自己的文件系统，同时可以从日志中恢复
