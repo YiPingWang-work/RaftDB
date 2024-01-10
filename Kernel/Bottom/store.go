@@ -21,7 +21,7 @@ type Medium interface {
 	Append(path string, content string) error
 }
 
-func (s *Store) initAndLoad(confPath string, filePath string, meta *Meta.Meta, logs *Log.Logs,
+func (s *Store) initAndLoad(confPath string, filePath string, meta *Meta.Meta, logs *Log.LogSet,
 	m Medium,
 	mediumParam interface{}) error {
 
@@ -38,7 +38,7 @@ func (s *Store) initAndLoad(confPath string, filePath string, meta *Meta.Meta, l
 	return nil
 }
 
-func (s *Store) appendLogs(logs *[]Log.LogContent) error {
+func (s *Store) appendLogs(logs *[]Log.Log) error {
 	for _, v := range *logs {
 		if err := s.medium.Append(s.filePath, Log.LogToString(v)); err != nil {
 			log.Println(err)
@@ -59,7 +59,7 @@ func (s *Store) getMeta(metaPath string, meta *Meta.Meta) error {
 	return json.Unmarshal([]byte(str), meta)
 }
 
-func (s *Store) loadFrom0(logPath string, logs *Log.Logs) error {
+func (s *Store) loadFrom0(logPath string, logs *Log.LogSet) error {
 	var str string
 	if err := s.medium.Read(logPath, &str); err != nil {
 		return err

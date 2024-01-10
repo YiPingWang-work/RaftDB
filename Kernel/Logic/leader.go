@@ -14,8 +14,8 @@ import (
 var leader Leader
 
 type Leader struct {
-	agreeMap map[Log.LogKey]fc // 对于哪条记录，同意的follower集合和这个消息来自哪个client
-	index    int               // 当前日志的index
+	agreeMap map[Log.Key]fc // 对于哪条记录，同意的follower集合和这个消息来自哪个client
+	index    int            // 当前日志的index
 }
 
 type fc struct {
@@ -28,7 +28,7 @@ type fc struct {
 */
 
 func (l *Leader) init(me *Me) error {
-	l.agreeMap, l.index = map[Log.LogKey]fc{}, 0
+	l.agreeMap, l.index = map[Log.Key]fc{}, 0
 	return l.processTimeout(me)
 }
 
@@ -82,7 +82,7 @@ func (l *Leader) processAppendLogReply(msg Order.Message, me *Me) error {
 					LastLogKey:       msg.LastLogKey,
 					SecondLastLogKey: secondLastKey,
 				}}
-				for _, v := range me.logs.GetKeysByRange(secondLastKey, msg.LastLogKey) {
+				for _, v := range me.logs.GetKsByRange(secondLastKey, msg.LastLogKey) {
 					me.clientSyncFinishedChan <- l.agreeMap[v].client
 					delete(l.agreeMap, v)
 				}
@@ -96,7 +96,7 @@ func (l *Leader) processAppendLogReply(msg Order.Message, me *Me) error {
 		*/
 		nextKey := me.logs.GetNext(msg.LastLogKey)
 		if nextKey.Term != -1 {
-			req, err := me.logs.GetContentByKey(nextKey)
+			req, err := me.logs.GetVByK(nextKey)
 			if err != nil {
 				return err
 			}
@@ -122,7 +122,7 @@ func (l *Leader) processAppendLogReply(msg Order.Message, me *Me) error {
 			return errors.New("error: follower request wrong log")
 		}
 		reply.Type, reply.To = Order.AppendLog, []int{msg.From}
-		if req, err := me.logs.GetContentByKey(reply.LastLogKey); err != nil {
+		if req, err := me.logs.GetVByK(reply.LastLogKey); err != nil {
 			return err
 		} else {
 			reply.Log = req
@@ -167,8 +167,8 @@ func (l *Leader) processFromClient(msg Order.Message, me *Me) error {
 
 func (l *Leader) processClientSync(msg Order.Message, me *Me) error {
 	secondLastKey := me.logs.GetLast()
-	lastLogKey := Log.LogKey{Term: me.meta.Term, Index: l.index}
-	me.logs.Append(Log.LogContent{Key: lastLogKey, Log: msg.Log})
+	lastLogKey := Log.Key{Term: me.meta.Term, Index: l.index}
+	me.logs.Append(Log.Log{K: lastLogKey, V: msg.Log})
 	l.agreeMap[lastLogKey] = fc{followers: map[int]bool{}, client: msg.From}
 	me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Message{
 		Type:             Order.AppendLog,

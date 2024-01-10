@@ -22,7 +22,7 @@ type RPC struct {
 
 func (r *RPC) Init(replyChan interface{}) error {
 	if x, ok := replyChan.(chan Order.Order); !ok {
-		return errors.New("you should give rpc a chan")
+		return errors.New("RPC: Init need a reply chan")
 	} else {
 		r.replyChan = x
 	}
@@ -36,7 +36,7 @@ func (r *RPC) Init(replyChan interface{}) error {
 
 func (r *RPC) Send(addr string, msg interface{}) {
 	if x, ok := msg.(Order.Message); !ok {
-		log.Println("you should give me a Order>Message")
+		log.Println("RPC: Send need a Order>Message")
 	} else {
 		client, err := rpc.Dial("tcp", addr)
 		if err != nil {
@@ -75,7 +75,7 @@ func (r *RPC) ChangeNetworkDelay(delay int, random bool) {
 
 func (r *RPC) ReplyClient(msg interface{}) {
 	if x, ok := msg.(Order.Message); !ok {
-		log.Println("you should give me a Order>Message")
+		log.Println("RPC: ReplyClient need a Order.Message")
 	} else {
 		ch, ok := r.clientChans.Load(x.From)
 		if ok {

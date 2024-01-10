@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-func Monitor(me *Logic.Me, logs *Log.Logs, bottom *Bottom.Bottom, crown *Crown.Crown) { // 禁止修改参数
+func Monitor(me *Logic.Me, logs *Log.LogSet, bottom *Bottom.Bottom, crown *Crown.Crown) { // 禁止修改参数
 	for {
 		var x string
 		fmt.Scanln(&x)

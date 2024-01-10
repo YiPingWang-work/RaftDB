@@ -63,7 +63,7 @@ func (f *Follower) processAppendLog(msg Order.Message, me *Me) error {
 			return err
 		} else {
 			for _, v := range contents {
-				me.toCrownChan <- Something.Something{NeedReply: false, Content: "!" + v.Log}
+				me.toCrownChan <- Something.Something{NeedReply: false, Content: "!" + v.V}
 			}
 		}
 		log.Printf("Follower: receive a less log %v from %d, remove logs until last log is %v\n",
@@ -71,7 +71,7 @@ func (f *Follower) processAppendLog(msg Order.Message, me *Me) error {
 	}
 	if me.logs.GetLast().Equals(msg.SecondLastLogKey) && msg.Type == Order.AppendLog {
 		reply.Agree = true
-		me.logs.Append(Log.LogContent{Key: msg.LastLogKey, Log: msg.Log})
+		me.logs.Append(Log.Log{K: msg.LastLogKey, V: msg.Log})
 		me.toCrownChan <- Something.Something{NeedReply: false, Content: msg.Log}
 		log.Printf("Follower: accept %d's request %v\n", msg.From, msg.LastLogKey)
 	} else {

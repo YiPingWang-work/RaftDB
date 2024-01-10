@@ -39,7 +39,7 @@ func (c *Crown) Run() {
 				log.Println("error: logic chan closed")
 			}
 			if len(sth.Content) == 0 {
-				log.Println("Crown: empty Something.Content error")
+				log.Println("Crown: empty Something.V error")
 			} else if sth.Content[0] == '!' {
 				if out, agree, err := c.app.UndoProcess(sth.Content); err != nil {
 					log.Println(err)
