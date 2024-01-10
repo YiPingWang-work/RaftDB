@@ -23,7 +23,7 @@ type Me struct {
 	toCrownChan             chan<- Something.Something // 上层接口
 	clientSyncFinishedChan  chan int                   // 客户端同步处理完成通知
 	clientSyncMap           map[int]clientSync         // clientSyncMap只会保存leader在本轮任期内需要同步的消息
-	logs                    *Log.LogSet                // 日志指针
+	logSet                  *Log.LogSet                // 日志指针
 	leaderHeartbeat         time.Duration              // leader心跳间隔
 	followerTimeout         time.Duration              // follower超时时间
 	candidatePreVoteTimeout time.Duration              // candidate预选举超时
@@ -61,10 +61,10 @@ type Role interface {
 初始化，设置元数据信息，设置日志信息，设置超时时间，设置通讯管道
 */
 
-func (m *Me) Init(meta *Meta.Meta, logs *Log.LogSet,
+func (m *Me) Init(meta *Meta.Meta, logSet *Log.LogSet,
 	fromBottomChan <-chan Order.Order, toBottomChan chan<- Order.Order,
 	fromCrownChan <-chan Something.Something, toCrownChan chan<- Something.Something) {
-	m.meta, m.logs = meta, logs
+	m.meta, m.logSet = meta, logSet
 	m.fromBottomChan, m.toBottomChan = fromBottomChan, toBottomChan
 	m.fromCrownChan, m.toCrownChan = fromCrownChan, toCrownChan
 	m.clientSyncFinishedChan = make(chan int, 100000)

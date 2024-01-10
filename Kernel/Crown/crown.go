@@ -1,7 +1,7 @@
 package Crown
 
 import (
-	"RaftDB/Custom/DB/KVDB"
+	"RaftDB/Kernel/Log"
 	"RaftDB/Kernel/Pipe/Something"
 	"log"
 )
@@ -25,10 +25,15 @@ type App interface {
 	ToString() string
 }
 
-func (c *Crown) Init(fromLogicChan <-chan Something.Something, toLogicChan chan<- Something.Something) {
+func (c *Crown) Init(logSet *Log.LogSet, app App, fromLogicChan <-chan Something.Something, toLogicChan chan<- Something.Something) {
 	c.toLogicChan, c.fromLogicChan = toLogicChan, fromLogicChan
-	c.app = &KVDB.KVDB{}
+	c.app = app
 	c.app.Init()
+	for _, v := range logSet.GetAll() {
+		if _, ok, err := c.app.Process(v.V); err != nil || !ok {
+			log.Println("Crown: process history log error")
+		}
+	}
 }
 
 func (c *Crown) Run() {

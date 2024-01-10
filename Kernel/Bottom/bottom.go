@@ -48,7 +48,7 @@ func (b *Bottom) Run() {
 					}
 				} else {
 					log.Printf("store: write log from %d to %d\n", order.Msg.SecondLastLogKey, order.Msg.LastLogKey)
-					contents := b.logs.GetVsByRange(order.Msg.SecondLastLogKey, order.Msg.LastLogKey)
+					contents := b.logs.GetLogsByRange(order.Msg.SecondLastLogKey, order.Msg.LastLogKey)
 					if err := b.store.appendLogs(&contents); err != nil {
 						log.Println(err)
 					}

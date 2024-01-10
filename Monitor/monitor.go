@@ -20,7 +20,7 @@ func Monitor(me *Logic.Me, logs *Log.LogSet, bottom *Bottom.Bottom, crown *Crown
 		} else if x == "log" {
 			fmt.Println(logs.ToString())
 			continue
-		} else if x == "crown" {
+		} else if x == "app" {
 			fmt.Println(crown.ToString())
 			continue
 		} else {
@@ -37,6 +37,6 @@ func Monitor(me *Logic.Me, logs *Log.LogSet, bottom *Bottom.Bottom, crown *Crown
 				}
 			}
 		}
-		fmt.Println("use 'me' to get node info, use 'log' to get log info, use 'delay,[ms],[randn]' to imitate network delay")
+		fmt.Println("use 'me' to get node info, use 'log' to get log info, use 'delay,[ms],[randn]' to imitate network delay, use app to get app info")
 	}
 }

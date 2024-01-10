@@ -13,7 +13,7 @@ type Communicate struct {
 
 type Cable interface {
 	Init(cableParam interface{}) error
-	Send(addr string, msg interface{})
+	ReplyNode(addr string, msg interface{})
 	Listen(addr string) error
 	ReplyClient(msg interface{})
 	ChangeNetworkDelay(delay int, random bool)
@@ -27,7 +27,7 @@ func (c *Communicate) init(cable Cable, addr string, dns []string, cableParam in
 func (c *Communicate) send(msg Order.Message) error {
 	for _, v := range msg.To {
 		if addr := c.dns[v]; addr != c.addr {
-			go c.cable.Send(addr, msg)
+			go c.cable.ReplyNode(addr, msg)
 		}
 	}
 	return nil

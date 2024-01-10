@@ -139,7 +139,7 @@ func (c *Candidate) processTimeout(me *Me) error {
 	reply := Order.Message{
 		From:       me.meta.Id,
 		To:         me.members,
-		LastLogKey: me.logs.GetLast(),
+		LastLogKey: me.logSet.GetLast(),
 	}
 	if c.state == 0 {
 		reply.Type = Order.PreVote

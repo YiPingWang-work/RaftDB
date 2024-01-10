@@ -48,14 +48,14 @@ func (l *Leader) processAppendLogReply(msg Order.Message, me *Me) error {
 		Term:       me.meta.Term,
 		LastLogKey: msg.LastLogKey,
 	}
-	if me.logs.GetLast().Less(msg.LastLogKey) {
+	if me.logSet.GetLast().Less(msg.LastLogKey) {
 		/*
 			如果follower回复的Key比自己的LastKey都大，错误。
 		*/
 		return errors.New("error: a follower has greater key")
 	}
 	if msg.Agree == true {
-		if !me.logs.GetCommitted().Less(msg.LastLogKey) {
+		if !me.logSet.GetCommitted().Less(msg.LastLogKey) {
 			/*
 				如果回复的key自己已经提交，则不用参与计票，直接对其确认，发送给源follower。
 			*/
@@ -75,14 +75,14 @@ func (l *Leader) processAppendLogReply(msg Order.Message, me *Me) error {
 				} else {
 					me.toBottomChan <- Order.Order{Type: Order.Store, Msg: Order.Message{Agree: true, Log: string(metaTmp)}}
 				}
-				previousCommitted := me.logs.Commit(msg.LastLogKey)
-				secondLastKey := me.logs.GetNext(previousCommitted)
+				previousCommitted := me.logSet.Commit(msg.LastLogKey)
+				secondLastKey := me.logSet.GetNext(previousCommitted)
 				me.toBottomChan <- Order.Order{Type: Order.Store, Msg: Order.Message{
 					Agree:            false,
 					LastLogKey:       msg.LastLogKey,
 					SecondLastLogKey: secondLastKey,
 				}}
-				for _, v := range me.logs.GetKsByRange(secondLastKey, msg.LastLogKey) {
+				for _, v := range me.logSet.GetKsByRange(secondLastKey, msg.LastLogKey) {
 					me.clientSyncFinishedChan <- l.agreeMap[v].client
 					delete(l.agreeMap, v)
 				}
@@ -94,9 +94,9 @@ func (l *Leader) processAppendLogReply(msg Order.Message, me *Me) error {
 		/*
 			如果这条日志不是leader最新的日志，则尝试发送这条日志的下一条给源follower
 		*/
-		nextKey := me.logs.GetNext(msg.LastLogKey)
+		nextKey := me.logSet.GetNext(msg.LastLogKey)
 		if nextKey.Term != -1 {
-			req, err := me.logs.GetVByK(nextKey)
+			req, err := me.logSet.GetVByK(nextKey)
 			if err != nil {
 				return err
 			}
@@ -109,7 +109,7 @@ func (l *Leader) processAppendLogReply(msg Order.Message, me *Me) error {
 				SecondLastLogKey: msg.LastLogKey,
 				Log:              req,
 			}}
-			log.Printf("Leader: %d accept my request %v, but %d's logs is not complete, send request %v\n",
+			log.Printf("Leader: %d accept my request %v, but %d's logSet is not complete, send request %v\n",
 				msg.From, msg.LastLogKey, msg.From, nextKey)
 		}
 	} else {
@@ -117,17 +117,17 @@ func (l *Leader) processAppendLogReply(msg Order.Message, me *Me) error {
 			如果不同意这条消息，发送follower回复的最新消息的下一条（follower的最新消息在msg.SecondLastLogKey中携带）
 		*/
 		reply.SecondLastLogKey = msg.SecondLastLogKey
-		reply.LastLogKey = me.logs.GetNext(reply.SecondLastLogKey)
+		reply.LastLogKey = me.logSet.GetNext(reply.SecondLastLogKey)
 		if reply.LastLogKey.Term == -1 {
 			return errors.New("error: follower request wrong log")
 		}
 		reply.Type, reply.To = Order.AppendLog, []int{msg.From}
-		if req, err := me.logs.GetVByK(reply.LastLogKey); err != nil {
+		if req, err := me.logSet.GetVByK(reply.LastLogKey); err != nil {
 			return err
 		} else {
 			reply.Log = req
 		}
-		log.Printf("Leader: %d refuse my request %v, his logs are not complete, which is %v, send request %v\n",
+		log.Printf("Leader: %d refuse my request %v, his logSet are not complete, which is %v, send request %v\n",
 			msg.From, msg.LastLogKey, msg.SecondLastLogKey, reply.LastLogKey)
 	}
 	if len(reply.To) != 0 {
@@ -166,9 +166,9 @@ func (l *Leader) processFromClient(msg Order.Message, me *Me) error {
 }
 
 func (l *Leader) processClientSync(msg Order.Message, me *Me) error {
-	secondLastKey := me.logs.GetLast()
+	secondLastKey := me.logSet.GetLast()
 	lastLogKey := Log.Key{Term: me.meta.Term, Index: l.index}
-	me.logs.Append(Log.Log{K: lastLogKey, V: msg.Log})
+	me.logSet.Append(Log.Log{K: lastLogKey, V: msg.Log})
 	l.agreeMap[lastLogKey] = fc{followers: map[int]bool{}, client: msg.From}
 	me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Message{
 		Type:             Order.AppendLog,
@@ -192,8 +192,8 @@ func (l *Leader) processTimeout(me *Me) error {
 		From:             me.meta.Id,
 		To:               me.members,
 		Term:             me.meta.Term,
-		LastLogKey:       me.logs.GetLast(),
-		SecondLastLogKey: me.logs.GetSecondLast(),
+		LastLogKey:       me.logSet.GetLast(),
+		SecondLastLogKey: me.logSet.GetSecondLast(),
 	}}
 	me.timer = time.After(me.leaderHeartbeat)
 	log.Println("Leader: timeout")

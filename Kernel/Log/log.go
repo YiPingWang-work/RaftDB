@@ -248,7 +248,7 @@ func (l *LogSet) Iterator(key Key) int { // 根据Key返回迭代器，没找到
 	return -1
 }
 
-func (l *LogSet) GetVsByRange(begin Key, end Key) []Log { // 返回 [begin, end]闭区间内的所有日志信息
+func (l *LogSet) GetLogsByRange(begin Key, end Key) []Log { // 返回 [begin, end]闭区间内的所有日志信息
 	l.m.RLock()
 	beginIter, endIter := l.Iterator(begin), l.Iterator(end)
 	if beginIter == -1 || endIter == -1 || beginIter > endIter {
@@ -276,6 +276,10 @@ func (l *LogSet) GetKsByRange(begin Key, end Key) []Key { // 返回 [begin, end]
 		l.m.RUnlock()
 		return tmp
 	}
+}
+
+func (l *LogSet) GetAll() []Log { // 线程不安全
+	return l.logs
 }
 
 func (l *LogSet) ToString() string {

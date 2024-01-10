@@ -34,9 +34,9 @@ func (r *RPC) Init(replyChan interface{}) error {
 	return nil
 }
 
-func (r *RPC) Send(addr string, msg interface{}) {
+func (r *RPC) ReplyNode(addr string, msg interface{}) {
 	if x, ok := msg.(Order.Message); !ok {
-		log.Println("RPC: Send need a Order>Message")
+		log.Println("RPC: ReplyNode need a Order>Message")
 	} else {
 		client, err := rpc.Dial("tcp", addr)
 		if err != nil {

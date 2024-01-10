@@ -30,8 +30,8 @@ func (f *Follower) init(me *Me) error {
 func (f *Follower) processHeartbeat(msg Order.Message, me *Me) error {
 	me.timer = time.After(me.followerTimeout)
 	log.Printf("Follower: leader %d's heartbeat\n", msg.From)
-	if me.logs.GetLast().Less(msg.LastLogKey) {
-		log.Println("Follower: my logs are not complete")
+	if me.logSet.GetLast().Less(msg.LastLogKey) {
+		log.Println("Follower: my logSet are not complete")
 		return f.processAppendLog(msg, me)
 	}
 	return nil
@@ -55,28 +55,28 @@ func (f *Follower) processAppendLog(msg Order.Message, me *Me) error {
 		Term:       me.meta.Term,
 		LastLogKey: msg.LastLogKey,
 	}
-	if !me.logs.GetCommitted().Less(msg.LastLogKey) { // 如果收到希望处理的日志比自己已提交的日志要小，不处理
+	if !me.logSet.GetCommitted().Less(msg.LastLogKey) { // 如果收到希望处理的日志比自己已提交的日志要小，不处理
 		return nil
 	}
-	if me.logs.GetLast().Greater(msg.SecondLastLogKey) {
-		if contents, err := me.logs.Remove(msg.SecondLastLogKey); err != nil { // 如果报错，则和上面的"也就是secondLast一定大于等于自己已提交的日志"冲突
+	if me.logSet.GetLast().Greater(msg.SecondLastLogKey) {
+		if contents, err := me.logSet.Remove(msg.SecondLastLogKey); err != nil { // 如果报错，则和上面的"也就是secondLast一定大于等于自己已提交的日志"冲突
 			return err
 		} else {
 			for _, v := range contents {
 				me.toCrownChan <- Something.Something{NeedReply: false, Content: "!" + v.V}
 			}
 		}
-		log.Printf("Follower: receive a less log %v from %d, remove logs until last log is %v\n",
-			msg.LastLogKey, msg.From, me.logs.GetLast())
+		log.Printf("Follower: receive a less log %v from %d, remove logSet until last log is %v\n",
+			msg.LastLogKey, msg.From, me.logSet.GetLast())
 	}
-	if me.logs.GetLast().Equals(msg.SecondLastLogKey) && msg.Type == Order.AppendLog {
+	if me.logSet.GetLast().Equals(msg.SecondLastLogKey) && msg.Type == Order.AppendLog {
 		reply.Agree = true
-		me.logs.Append(Log.Log{K: msg.LastLogKey, V: msg.Log})
+		me.logSet.Append(Log.Log{K: msg.LastLogKey, V: msg.Log})
 		me.toCrownChan <- Something.Something{NeedReply: false, Content: msg.Log}
 		log.Printf("Follower: accept %d's request %v\n", msg.From, msg.LastLogKey)
 	} else {
-		reply.Agree, reply.SecondLastLogKey = false, me.logs.GetLast()
-		log.Printf("Follower: refuse %d's request %v, my last log is %v\n", msg.From, msg.LastLogKey, me.logs.GetLast())
+		reply.Agree, reply.SecondLastLogKey = false, me.logSet.GetLast()
+		log.Printf("Follower: refuse %d's request %v, my last log is %v\n", msg.From, msg.LastLogKey, me.logSet.GetLast())
 	}
 	me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: reply}
 	me.timer = time.After(me.followerTimeout)
@@ -92,14 +92,14 @@ follower将提交所有小于等于提交请求key的log。
 */
 
 func (f *Follower) processCommit(msg Order.Message, me *Me) error {
-	if !me.logs.GetCommitted().Less(msg.LastLogKey) {
+	if !me.logSet.GetCommitted().Less(msg.LastLogKey) {
 		return nil
 	}
-	previousCommitted := me.logs.Commit(msg.LastLogKey)
-	if previousCommitted == me.logs.GetCommitted() {
+	previousCommitted := me.logSet.Commit(msg.LastLogKey)
+	if previousCommitted == me.logSet.GetCommitted() {
 		return nil
 	}
-	me.meta.CommittedKeyTerm, me.meta.CommittedKeyIndex = me.logs.GetCommitted().Term, me.logs.GetCommitted().Index
+	me.meta.CommittedKeyTerm, me.meta.CommittedKeyIndex = me.logSet.GetCommitted().Term, me.logSet.GetCommitted().Index
 	if metaTmp, err := json.Marshal(*me.meta); err != nil {
 		return err
 	} else {
@@ -109,12 +109,12 @@ func (f *Follower) processCommit(msg Order.Message, me *Me) error {
 		Type: Order.Store,
 		Msg: Order.Message{
 			Agree:            false,
-			LastLogKey:       me.logs.GetCommitted(),
-			SecondLastLogKey: me.logs.GetNext(previousCommitted),
+			LastLogKey:       me.logSet.GetCommitted(),
+			SecondLastLogKey: me.logSet.GetNext(previousCommitted),
 		}}
 	me.timer = time.After(me.followerTimeout)
-	log.Printf("Follower: commit logs whose key from %v to %v\n",
-		me.logs.GetNext(previousCommitted), me.logs.GetCommitted())
+	log.Printf("Follower: commit logSet whose key from %v to %v\n",
+		me.logSet.GetNext(previousCommitted), me.logSet.GetCommitted())
 	return nil
 }
 
@@ -129,8 +129,8 @@ func (f *Follower) processVote(msg Order.Message, me *Me) error {
 		To:   []int{msg.From},
 		Term: me.meta.Term,
 	}
-	if f.voted != -1 && f.voted != msg.From || me.logs.GetLast().Greater(msg.LastLogKey) {
-		reply.Agree, reply.SecondLastLogKey = false, me.logs.GetLast()
+	if f.voted != -1 && f.voted != msg.From || me.logSet.GetLast().Greater(msg.LastLogKey) {
+		reply.Agree, reply.SecondLastLogKey = false, me.logSet.GetLast()
 		log.Printf("Follower: refuse %d's vote, because vote: %d, myLastKey: %v, yourLastKey: %v\n",
 			msg.From, f.voted, reply.SecondLastLogKey, msg.LastLogKey)
 	} else {
