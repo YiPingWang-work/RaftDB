@@ -80,7 +80,7 @@ func (k *KVDB) UndoProcess(in string) (out string, agree bool, err error) {
 }
 
 func (k *KVDB) parser(order string) (op, bool) {
-	res := strings.SplitN(order, " ", 3)
+	res := strings.Split(order, " ")
 	if len(res) == 2 && res[0] == "read" {
 		return op{opType: read, data: kvData{key: res[1]}}, true
 	} else if len(res) == 3 && res[0] == "write" {
