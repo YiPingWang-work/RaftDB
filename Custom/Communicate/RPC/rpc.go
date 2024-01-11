@@ -53,7 +53,7 @@ func (r *RPC) ReplyNode(addr string, msg interface{}) error {
 		defer client.Close()
 		time.Sleep(r.delay)
 		if err = client.Call("RPC.Push", x, nil); err != nil {
-			log.Println(err)
+			return err
 		}
 	}
 	return nil

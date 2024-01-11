@@ -11,6 +11,10 @@ import (
 	"time"
 )
 
+/*
+如果发现当前集群出现两个及其以上的leader，Panic退出，因为会造成数据不一致。
+*/
+
 var leader Leader
 
 type Leader struct {

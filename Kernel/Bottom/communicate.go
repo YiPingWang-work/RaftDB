@@ -23,7 +23,7 @@ type Cable interface {
 }
 
 /*
-通讯系统初始化，实例化自己的信道类型，保存本机的addr和所有通讯节点的映射信息；将上层传过来的信道实例初始化。
+通讯系统初始化，实例化自己的信道类型，保存本机的addr和所有通讯节点的映射信息；将上层传过来的信道实例初始化。失败报错。
 */
 
 func (c *Communicate) init(cable Cable, addr string, dns []string, cableParam interface{}) error {
@@ -42,13 +42,25 @@ func (c *Communicate) replyNode(msg Order.Message) (err error) {
 	return err
 }
 
+/*
+开启监听，监听是另一个协程。要求在监听初始化的时候失败会报错，其余情况只提示连接失败。
+*/
+
 func (c *Communicate) listen() error {
 	return c.cable.Listen(c.addr)
 }
 
+/*
+回复客户节点，回复不了报错。
+*/
+
 func (c *Communicate) ReplyClient(msg Order.Message) error {
 	return c.cable.ReplyClient(msg)
 }
+
+/*
+回复服务节点，回复不了报错。
+*/
 
 func (c *Communicate) ChangeNetworkDelay(delay int, random bool) {
 	c.cable.ChangeNetworkDelay(delay, random)

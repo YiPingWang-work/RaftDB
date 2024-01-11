@@ -86,6 +86,7 @@ Logic层的主体函数，不断获取来自bottom的消息和定时器超时的
 收到服务节点的消息后转到process函数。
 收到客户端消息，说明自己是leader，直接调用processClient函数。
 计时器到期后调用计时器到期处理函数。
+在执行过程中发现通讯管道关闭，Panic返回。
 */
 
 func (m *Me) Run() {

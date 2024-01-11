@@ -21,6 +21,7 @@ bottom初始化，它需要完成：
 	2.使用给定的存储介质实体和网线实体初始化自己的存储系统和通信系统
 	3.保存自己和Logic层的通讯管道
 	4.保存日志系统，注意它和Logic层都有对日志系统的读写权限
+一旦初始化为正确执行，Panic结束。
 */
 
 func (b *Bottom) Init(confPath string, filePath string, meta *Meta.Meta, logs *Log.LogSet,
@@ -40,7 +41,8 @@ func (b *Bottom) Init(confPath string, filePath string, meta *Meta.Meta, logs *L
 }
 
 /*
-运行期间不断收取Logic层传过来的信息，进行处理。
+运行期间不断收取Logic层传过来的信息，进行处理。如果一开始连接不可用说明系统无法启动，Panic处理。
+在执行过程中发现通讯管道关闭，Panic返回。
 */
 
 func (b *Bottom) Run() {

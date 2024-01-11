@@ -47,6 +47,7 @@ func (c *Crown) Init(logSet *Log.LogSet, app App, fromLogicChan <-chan Something
 
 /*
 开始监听通讯管道，如果有消息处理，处理，如果该消息需要回复，将结果回复。
+在执行过程中发现通讯管道关闭，Panic返回。
 */
 
 func (c *Crown) Run() {

@@ -45,6 +45,10 @@ func (s *Store) initAndLoad(confPath string, filePath string, meta *Meta.Meta, l
 	return nil
 }
 
+/*
+给出一组内存中的日志，将这一组日志按照顺序追加写入磁盘文件。为保证系统持续运行，如果追加失败，提示错误不会Panic。
+*/
+
 func (s *Store) appendLogs(logs *[]Log.Log) error {
 	for _, v := range *logs {
 		if err := s.medium.Append(s.filePath, Log.LogToString(v)); err != nil {
@@ -54,9 +58,17 @@ func (s *Store) appendLogs(logs *[]Log.Log) error {
 	return nil
 }
 
+/*
+更新磁盘中的配置信息，写入失败报错。
+*/
+
 func (s *Store) updateMeta(meta string) error {
 	return s.medium.Write(s.confPath, meta)
 }
+
+/*
+获取磁盘中的配置信息，只有系统初始化的时候使用，获取不到报错。
+*/
 
 func (s *Store) getMeta(metaPath string, meta *Meta.Meta) error {
 	var str string
@@ -65,6 +77,10 @@ func (s *Store) getMeta(metaPath string, meta *Meta.Meta) error {
 	}
 	return json.Unmarshal([]byte(str), meta)
 }
+
+/*
+加载磁盘中的历史记录，只有系统初始化的时候使用，获取不到报错。
+*/
 
 func (s *Store) loadFrom0(logPath string, logs *Log.LogSet) error {
 	var str string
