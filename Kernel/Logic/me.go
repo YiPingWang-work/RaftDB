@@ -136,8 +136,8 @@ func (m *Me) Run() {
 			}
 			/*
 				如果这是一个同步请求并且在同步消息映射表中还能找i得到，同时当前的角色是leader，说明这是一个当前leader处理的同时是需要同步的消息，则进行同步处理。
-				如果这是一个单一请求，则直接返回客户端消息.
-				否则这是一个过期的需要同步的请求，但资源已经被销毁，应给是历史请求，新一轮的me给出相应的错误响应。
+				如果这是一个不需要同步的请求，则直接返回客户端消息.
+				否则这是一个过期的需要同步的请求，但资源已经被销毁，应给是上周目的历史消息，这周目的me给出相应的错误响应。
 			*/
 			if csp, has := m.clientSyncMap[id]; has {
 				if err := m.role.processClientSync(csp.msg, m); err != nil {
@@ -160,7 +160,7 @@ func (m *Me) Run() {
 				panic("me.clientSyncFinishedChan closed")
 			}
 			/*
-				说明本条消息同步成功，但如果此时me进入新一轮，则不知道回复是什么，但是会告诉客户端成功执行，只不过不知道crown的回复。
+				说明本条消息同步成功，但如果此时me是下周目的，那么它将不知道回复是什么，但是会告诉客户端成功执行，只不过不知道crown的回复。
 			*/
 			if csp, has := m.clientSyncMap[id]; has {
 				m.toBottomChan <- Order.Order{Type: Order.ClientReply, Msg: csp.msg}
