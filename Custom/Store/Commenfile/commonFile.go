@@ -5,6 +5,15 @@ import (
 	"os"
 )
 
+/*
+type Medium interface {
+	Init(mediumParam interface{}) error
+	Read(path string, content *string) error
+	Write(path string, content string) error
+	Append(path string, content string) error
+}
+*/
+
 type CommonFile struct{}
 
 func (c *CommonFile) Init(interface{}) error {

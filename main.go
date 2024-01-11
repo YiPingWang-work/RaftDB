@@ -19,6 +19,8 @@ import (
 	"time"
 )
 
+// 你可以修改Gogo函数使其完成你的定制化功能
+
 func Gogo(confPath string, logPath string, medium Bottom.Medium, cable Bottom.Cable, app Crown.App) {
 	var bottom Bottom.Bottom                               // 声明通信和存储底座，内部数据结构线程不安全
 	var meta Meta.Meta                                     // 新建元数据，元数据线程不安全
@@ -30,7 +32,7 @@ func Gogo(confPath string, logPath string, medium Bottom.Medium, cable Bottom.Ca
 	toCrownChan := make(chan Something.Something, 10000)   // 创建上层管道
 	fromCrownChan := make(chan Something.Something, 10000) // 创建上层通讯管道
 	bottom.Init(confPath, logPath, &meta, &logSet, medium, cable,
-		toBottomChan, fromBottomChan, nil, fromBottomChan) // 初始化系统底座，初始化meta和logs(传出参数)
+		toBottomChan, fromBottomChan, nil, fromBottomChan) // 初始化系统底座，初始化meta和logs（传入传出参数）
 	rand.Seed(time.Now().UnixNano() + int64(meta.Id)%1024)                            // 设置随机因子
 	log.Printf("\n%s\n", meta.ToString())                                             // 输出元数据信息
 	log.Printf("\n%s\n", logSet.ToString())                                           // 输出日志信息

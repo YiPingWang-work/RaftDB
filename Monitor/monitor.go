@@ -25,7 +25,7 @@ func Monitor(me *Logic.Me, logs *Log.LogSet, bottom *Bottom.Bottom, crown *Crown
 			continue
 		} else {
 			tmp := strings.Split(x, ",")
-			if len(tmp) == 3 && tmp[0] == "delay" {
+			if len(tmp) == 3 && tmp[0] == "netdelay" {
 				delay, err := strconv.Atoi(tmp[1])
 				if err == nil {
 					random, err := strconv.Atoi(tmp[2])
@@ -35,8 +35,22 @@ func Monitor(me *Logic.Me, logs *Log.LogSet, bottom *Bottom.Bottom, crown *Crown
 						continue
 					}
 				}
+			} else if len(tmp) == 3 && tmp[0] == "appdelay" {
+				delay, err := strconv.Atoi(tmp[1])
+				if err == nil {
+					random, err := strconv.Atoi(tmp[2])
+					if err == nil {
+						crown.ChangeProcessDelay(delay, random != 0)
+						fmt.Println("app delay changed")
+						continue
+					}
+				}
 			}
 		}
-		fmt.Println("use 'me' to get node info, use 'log' to get log info, use 'delay,[ms],[randn]' to imitate network delay, use app to get app info")
+		fmt.Println("use 'me' to get node info, " +
+			"use 'log' to get log info, " +
+			"use 'netdelay,[ms],[randn]' to imitate network delay, " +
+			"use 'appdelay,[ms],[randn]' to imitate app's process delay, " +
+			"use app to get app info")
 	}
 }

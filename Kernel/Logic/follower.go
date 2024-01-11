@@ -55,12 +55,12 @@ func (f *Follower) processAppendLog(msg Order.Message, me *Me) error {
 		Term:       me.meta.Term,
 		LastLogKey: msg.LastLogKey,
 	}
-	if !me.logSet.GetCommitted().Less(msg.LastLogKey) { // 如果收到希望处理的日志比自己已提交的日志要小，不处理
+	if !me.logSet.GetCommitted().Less(msg.LastLogKey) {
 		return nil
 	}
 	if me.logSet.GetLast().Greater(msg.SecondLastLogKey) {
-		if contents, err := me.logSet.Remove(msg.SecondLastLogKey); err != nil { // 如果报错，则和上面的"也就是secondLast一定大于等于自己已提交的日志"冲突
-			return err
+		if contents, err := me.logSet.Remove(msg.SecondLastLogKey); err != nil {
+			panic("panic: remove committed log")
 		} else {
 			for _, v := range contents {
 				me.toCrownChan <- Something.Something{NeedReply: false, Content: "!" + v.V}
@@ -83,7 +83,7 @@ func (f *Follower) processAppendLog(msg Order.Message, me *Me) error {
 	return nil
 }
 
-func (f *Follower) processAppendLogReply(msg Order.Message, me *Me) error {
+func (f *Follower) processAppendLogReply(Order.Message, *Me) error {
 	return nil
 }
 
@@ -96,7 +96,7 @@ func (f *Follower) processCommit(msg Order.Message, me *Me) error {
 		return nil
 	}
 	previousCommitted := me.logSet.Commit(msg.LastLogKey)
-	if previousCommitted == me.logSet.GetCommitted() {
+	if me.logSet.GetCommitted().Equals(previousCommitted) {
 		return nil
 	}
 	me.meta.CommittedKeyTerm, me.meta.CommittedKeyIndex = me.logSet.GetCommitted().Term, me.logSet.GetCommitted().Index
@@ -145,7 +145,7 @@ func (f *Follower) processVote(msg Order.Message, me *Me) error {
 	return nil
 }
 
-func (f *Follower) processVoteReply(msg Order.Message, me *Me) error {
+func (f *Follower) processVoteReply(Order.Message, *Me) error {
 	return nil
 }
 
@@ -159,7 +159,7 @@ func (f *Follower) processPreVote(msg Order.Message, me *Me) error {
 	return nil
 }
 
-func (f *Follower) processPreVoteReply(msg Order.Message, me *Me) error {
+func (f *Follower) processPreVoteReply(Order.Message, *Me) error {
 	return nil
 }
 
@@ -172,7 +172,7 @@ func (f *Follower) processFromClient(msg Order.Message, me *Me) error {
 	return nil
 }
 
-func (f *Follower) processClientSync(msg Order.Message, me *Me) error {
+func (f *Follower) processClientSync(Order.Message, *Me) error {
 	return errors.New("error: follower can not do sync")
 }
 
@@ -181,11 +181,11 @@ func (f *Follower) processTimeout(me *Me) error {
 	return me.switchToCandidate()
 }
 
-func (f *Follower) processExpansion(msg Order.Message, me *Me) error {
+func (f *Follower) processExpansion(Order.Message, *Me) error {
 	return nil
 }
 
-func (f *Follower) processExpansionReply(msg Order.Message, me *Me) error {
+func (f *Follower) processExpansionReply(Order.Message, *Me) error {
 	return nil
 }
 

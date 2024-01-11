@@ -18,12 +18,21 @@ type Crown struct {
 	fromLogicChan <-chan Something.Something // 上层接口
 }
 
+/*
+App接口需要实现初始化、操作与逆操作的功能。
+*/
+
 type App interface {
 	Process(in string) (out string, agreeNext bool, err error)
 	UndoProcess(in string) (out string, agreeNext bool, err error) // 处理逆信息
+	ChangeProcessDelay(delay int, random bool)
 	Init()
 	ToString() string
 }
+
+/*
+crown初始化，保存获取Logic层和crown层的通讯管道，初始化APP，应用Logic层的日志。
+*/
 
 func (c *Crown) Init(logSet *Log.LogSet, app App, fromLogicChan <-chan Something.Something, toLogicChan chan<- Something.Something) {
 	c.toLogicChan, c.fromLogicChan = toLogicChan, fromLogicChan
@@ -31,17 +40,21 @@ func (c *Crown) Init(logSet *Log.LogSet, app App, fromLogicChan <-chan Something
 	c.app.Init()
 	for _, v := range logSet.GetAll() {
 		if _, ok, err := c.app.Process(v.V); err != nil || !ok {
-			log.Println("Crown: process history log error")
+			log.Println("error: process history log error")
 		}
 	}
 }
+
+/*
+开始监听通讯管道，如果有消息处理，处理，如果该消息需要回复，将结果回复。
+*/
 
 func (c *Crown) Run() {
 	for {
 		select {
 		case sth, opened := <-c.fromLogicChan:
 			if !opened {
-				log.Println("error: logic chan closed")
+				panic("panic: logic chan closed")
 			}
 			if len(sth.Content) == 0 {
 				log.Println("Crown: empty Something.V error")
@@ -62,6 +75,10 @@ func (c *Crown) Run() {
 			}
 		}
 	}
+}
+
+func (c *Crown) ChangeProcessDelay(delay int, random bool) {
+	c.app.ChangeProcessDelay(delay, random)
 }
 
 func (c *Crown) ToString() string {

@@ -12,12 +12,20 @@ import (
 	"time"
 )
 
+/*
+	type Cable interface {
+		Init(cableParam interface{}) error
+		ReplyNode(addr string, msg interface{})
+		Listen(addr string) error
+		ReplyClient(msg interface{})
+		ChangeNetworkDelay(delay int, random bool)
+	}
+*/
 type RPC struct {
-	clientChans        sync.Map
-	replyChan          chan<- Order.Order
-	networkDelay       time.Duration
-	networkDelayRandom int
-	num                atomic.Int32
+	clientChans sync.Map
+	replyChan   chan<- Order.Order
+	delay       time.Duration
+	num         atomic.Int32
 }
 
 func (r *RPC) Init(replyChan interface{}) error {
@@ -34,20 +42,21 @@ func (r *RPC) Init(replyChan interface{}) error {
 	return nil
 }
 
-func (r *RPC) ReplyNode(addr string, msg interface{}) {
+func (r *RPC) ReplyNode(addr string, msg interface{}) error {
 	if x, ok := msg.(Order.Message); !ok {
-		log.Println("RPC: ReplyNode need a Order>Message")
+		return errors.New("RPC: ReplyNode need a Order.Message")
 	} else {
 		client, err := rpc.Dial("tcp", addr)
 		if err != nil {
-			return
+			return err
 		}
 		defer client.Close()
-		time.Sleep(r.networkDelay)
+		time.Sleep(r.delay)
 		if err = client.Call("RPC.Push", x, nil); err != nil {
 			log.Println(err)
 		}
 	}
+	return nil
 }
 
 func (r *RPC) Listen(addr string) error {
@@ -67,15 +76,15 @@ func (r *RPC) Listen(addr string) error {
 
 func (r *RPC) ChangeNetworkDelay(delay int, random bool) {
 	if !random {
-		r.networkDelay = time.Duration(delay) * time.Millisecond
+		r.delay = time.Duration(delay) * time.Millisecond
 	} else {
-		r.networkDelay = time.Duration(rand.Intn(delay)) * time.Millisecond
+		r.delay = time.Duration(rand.Intn(delay)) * time.Millisecond
 	}
 }
 
-func (r *RPC) ReplyClient(msg interface{}) {
+func (r *RPC) ReplyClient(msg interface{}) error {
 	if x, ok := msg.(Order.Message); !ok {
-		log.Println("RPC: ReplyClient need a Order.Message")
+		return errors.New("RPC: ReplyClient need a Order.Message")
 	} else {
 		ch, ok := r.clientChans.Load(x.From)
 		if ok {
@@ -85,6 +94,7 @@ func (r *RPC) ReplyClient(msg interface{}) {
 			}
 		}
 	}
+	return nil
 }
 
 func (r *RPC) Push(rec Order.Message, rep *string) error {

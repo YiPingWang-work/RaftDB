@@ -35,7 +35,7 @@ type clientSync struct {
 }
 
 /*
-Role接口定义了处理各种消息的函数，Follower、Leader、Candidate角色类实现Role接口。
+Role接口定义了处理各种消息的函数，Follower、Leader、Candidate角色类实现Role接口（状态机模型）。
 在Me中会保存一个Role接口role，这个role代表自己的角色，me直接通过调用role的接口函数间接调用各个角色实现的函数，而不需要判断自己的角色是什么。
 */
 
@@ -58,7 +58,7 @@ type Role interface {
 }
 
 /*
-初始化，设置元数据信息，设置日志信息，设置超时时间，设置通讯管道
+初始化，设置元数据信息，设置日志信息，设置超时时间，设置通讯管道（包括通向bottom端的和通向crown端的）
 */
 
 func (m *Me) Init(meta *Meta.Meta, logSet *Log.LogSet,
@@ -93,7 +93,7 @@ func (m *Me) Run() {
 		select {
 		case order, opened := <-m.fromBottomChan:
 			if !opened {
-				log.Println("error: bottom chan is closed")
+				panic("panic: bottom chan is closed")
 				return
 			}
 			if order.Type == Order.FromNode {
@@ -118,7 +118,7 @@ func (m *Me) Run() {
 			}
 		case sth, opened := <-m.fromCrownChan:
 			if !opened {
-				log.Println("error: crown chan is closed")
+				panic("panic: crown chan is closed")
 			}
 			id := sth.Id
 			if !sth.Agree {
@@ -156,7 +156,7 @@ func (m *Me) Run() {
 				Msg: Order.Message{From: id, Log: "operated but logic refuses to sync"}}
 		case id, opened := <-m.clientSyncFinishedChan:
 			if !opened {
-				log.Println("error: me.clientSyncFinishedChan closed")
+				panic("panic: me.clientSyncFinishedChan closed")
 			}
 			/*
 				说明本条消息同步成功，但如果此时me进入新一轮，则不知道回复是什么，但是会告诉客户端成功执行，只不过不知道crown的回复。

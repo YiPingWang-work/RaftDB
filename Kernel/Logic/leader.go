@@ -32,12 +32,12 @@ func (l *Leader) init(me *Me) error {
 	return l.processTimeout(me)
 }
 
-func (l *Leader) processHeartbeat(msg Order.Message, me *Me) error {
-	return errors.New("error: maybe two leaders")
+func (l *Leader) processHeartbeat(Order.Message, *Me) error {
+	panic("panic: maybe two leaders")
 }
 
-func (l *Leader) processAppendLog(msg Order.Message, me *Me) error {
-	return errors.New("error: maybe two leaders")
+func (l *Leader) processAppendLog(Order.Message, *Me) error {
+	panic("panic: maybe two leaders")
 }
 
 func (l *Leader) processAppendLogReply(msg Order.Message, me *Me) error {
@@ -136,23 +136,23 @@ func (l *Leader) processAppendLogReply(msg Order.Message, me *Me) error {
 	return nil
 }
 
-func (l *Leader) processCommit(msg Order.Message, me *Me) error {
-	return errors.New("error: maybe two leaders")
+func (l *Leader) processCommit(Order.Message, *Me) error {
+	panic("panic: maybe two leaders")
 }
 
-func (l *Leader) processVote(msg Order.Message, me *Me) error {
+func (l *Leader) processVote(_ Order.Message, me *Me) error {
 	return l.processTimeout(me)
 }
 
-func (l *Leader) processVoteReply(msg Order.Message, me *Me) error {
+func (l *Leader) processVoteReply(Order.Message, *Me) error {
 	return nil
 }
 
-func (l *Leader) processPreVote(msg Order.Message, me *Me) error {
+func (l *Leader) processPreVote(_ Order.Message, me *Me) error {
 	return l.processTimeout(me)
 }
 
-func (l *Leader) processPreVoteReply(msg Order.Message, me *Me) error {
+func (l *Leader) processPreVoteReply(Order.Message, *Me) error {
 	return nil
 }
 
@@ -200,11 +200,11 @@ func (l *Leader) processTimeout(me *Me) error {
 	return nil
 }
 
-func (l *Leader) processExpansion(msg Order.Message, me *Me) error {
+func (l *Leader) processExpansion(Order.Message, *Me) error {
 	return nil
 }
 
-func (l *Leader) processExpansionReply(msg Order.Message, me *Me) error {
+func (l *Leader) processExpansionReply(Order.Message, *Me) error {
 	return nil
 }
 
@@ -212,7 +212,7 @@ func (l *Leader) ToString() string {
 	res := fmt.Sprintf("==== LEADER ====\nindex: %d\nagreedReply:\n", l.index)
 	for k, v := range l.agreeMap {
 		s := fmt.Sprintf("	from: %d, key: {%d %d} -> ", v.client, k.Term, k.Index)
-		for k2, _ := range v.followers {
+		for k2 := range v.followers {
 			s += fmt.Sprintf("%d ", k2)
 		}
 		res += s + "\n"

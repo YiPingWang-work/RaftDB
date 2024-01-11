@@ -40,7 +40,7 @@ func (c *Candidate) processCommit(msg Order.Message, me *Me) error {
 	return me.switchToFollower(msg.Term, true, msg)
 }
 
-func (c *Candidate) processAppendLogReply(msg Order.Message, me *Me) error {
+func (c *Candidate) processAppendLogReply(Order.Message, *Me) error {
 	return nil
 }
 
@@ -123,7 +123,7 @@ func (c *Candidate) processFromClient(msg Order.Message, me *Me) error {
 	return nil
 }
 
-func (c *Candidate) processClientSync(msg Order.Message, me *Me) error {
+func (c *Candidate) processClientSync(Order.Message, *Me) error {
 	return errors.New("error: candidate can not do sync")
 }
 
@@ -163,11 +163,11 @@ func (c *Candidate) processTimeout(me *Me) error {
 	return nil
 }
 
-func (c *Candidate) processExpansion(msg Order.Message, me *Me) error {
+func (c *Candidate) processExpansion(Order.Message, *Me) error {
 	return nil
 }
 
-func (c *Candidate) processExpansionReply(msg Order.Message, me *Me) error {
+func (c *Candidate) processExpansionReply(Order.Message, *Me) error {
 	return nil
 }
 

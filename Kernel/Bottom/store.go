@@ -14,6 +14,10 @@ type Store struct {
 	filePath string
 }
 
+/*
+存储介质接口需要实现初始化，读写和追加写功能
+*/
+
 type Medium interface {
 	Init(mediumParam interface{}) error
 	Read(path string, content *string) error
@@ -21,10 +25,13 @@ type Medium interface {
 	Append(path string, content string) error
 }
 
+/*
+存储系统初始化，需要初始化存储介质，之后通过该介质读取磁盘中的配置信息和日志，并将其应用到日志系统和元数据系统。
+*/
+
 func (s *Store) initAndLoad(confPath string, filePath string, meta *Meta.Meta, logs *Log.LogSet,
 	m Medium,
 	mediumParam interface{}) error {
-
 	s.medium, s.confPath, s.filePath = m, confPath, filePath
 	if err := s.medium.Init(mediumParam); err != nil {
 		return err
