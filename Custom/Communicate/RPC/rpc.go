@@ -15,9 +15,9 @@ import (
 /*
 	type Cable interface {
 		Init(cableParam interface{}) error
-		ReplyNode(addr string, msg interface{})
+		ReplyNode(addr string, msg interface{}) error
 		Listen(addr string) error
-		ReplyClient(msg interface{})
+		ReplyClient(msg interface{}) error
 		ChangeNetworkDelay(delay int, random bool)
 	}
 */

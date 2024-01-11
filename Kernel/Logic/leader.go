@@ -33,11 +33,11 @@ func (l *Leader) init(me *Me) error {
 }
 
 func (l *Leader) processHeartbeat(Order.Message, *Me) error {
-	panic("panic: maybe two leaders")
+	panic("maybe two leaders")
 }
 
 func (l *Leader) processAppendLog(Order.Message, *Me) error {
-	panic("panic: maybe two leaders")
+	panic("maybe two leaders")
 }
 
 func (l *Leader) processAppendLogReply(msg Order.Message, me *Me) error {
@@ -137,7 +137,7 @@ func (l *Leader) processAppendLogReply(msg Order.Message, me *Me) error {
 }
 
 func (l *Leader) processCommit(Order.Message, *Me) error {
-	panic("panic: maybe two leaders")
+	panic("maybe two leaders")
 }
 
 func (l *Leader) processVote(_ Order.Message, me *Me) error {

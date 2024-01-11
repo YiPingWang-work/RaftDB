@@ -93,7 +93,7 @@ func (m *Me) Run() {
 		select {
 		case order, opened := <-m.fromBottomChan:
 			if !opened {
-				panic("panic: bottom chan is closed")
+				panic("bottom chan is closed")
 				return
 			}
 			if order.Type == Order.FromNode {
@@ -118,7 +118,7 @@ func (m *Me) Run() {
 			}
 		case sth, opened := <-m.fromCrownChan:
 			if !opened {
-				panic("panic: crown chan is closed")
+				panic("crown chan is closed")
 			}
 			id := sth.Id
 			if !sth.Agree {
@@ -156,7 +156,7 @@ func (m *Me) Run() {
 				Msg: Order.Message{From: id, Log: "operated but logic refuses to sync"}}
 		case id, opened := <-m.clientSyncFinishedChan:
 			if !opened {
-				panic("panic: me.clientSyncFinishedChan closed")
+				panic("me.clientSyncFinishedChan closed")
 			}
 			/*
 				说明本条消息同步成功，但如果此时me进入新一轮，则不知道回复是什么，但是会告诉客户端成功执行，只不过不知道crown的回复。
@@ -228,9 +228,8 @@ func (m *Me) switchToFollower(term int, has bool, msg Order.Message) error {
 	}
 	if has {
 		return m.processFromNode(msg)
-	} else {
-		return nil
 	}
+	return nil
 }
 
 /*

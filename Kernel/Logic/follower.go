@@ -60,7 +60,7 @@ func (f *Follower) processAppendLog(msg Order.Message, me *Me) error {
 	}
 	if me.logSet.GetLast().Greater(msg.SecondLastLogKey) {
 		if contents, err := me.logSet.Remove(msg.SecondLastLogKey); err != nil {
-			panic("panic: remove committed log")
+			panic("remove committed log")
 		} else {
 			for _, v := range contents {
 				me.toCrownChan <- Something.Something{NeedReply: false, Content: "!" + v.V}

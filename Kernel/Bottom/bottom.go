@@ -54,7 +54,7 @@ func (b *Bottom) Run() {
 		select {
 		case order, opened := <-b.fromLogicChan:
 			if !opened {
-				panic("panic: logic chan is closed")
+				panic("logic chan is closed")
 				return
 			}
 			if order.Type == Order.Store {

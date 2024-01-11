@@ -54,7 +54,7 @@ func (c *Crown) Run() {
 		select {
 		case sth, opened := <-c.fromLogicChan:
 			if !opened {
-				panic("panic: logic chan closed")
+				panic("logic chan closed")
 			}
 			if len(sth.Content) == 0 {
 				log.Println("Crown: empty Something.V error")
