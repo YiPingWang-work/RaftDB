@@ -26,7 +26,7 @@ type Medium interface {
 }
 
 /*
-存储系统初始化，需要初始化存储介质，之后通过该介质读取磁盘中的配置信息和日志，并将其应用到日志系统和元数据系统。
+存储系统初始化，需要初始化存储介质，之后通过该介质读取磁盘中的配置信息和日志，并将其通过传出参数返回上层。
 */
 
 func (s *Store) initAndLoad(confPath string, filePath string, meta *Meta.Meta, logs *Log.LogSet,

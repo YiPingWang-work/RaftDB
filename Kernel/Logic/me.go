@@ -30,7 +30,7 @@ type Me struct {
 	candidateVoteTimeout    time.Duration              // candidate选举超时
 }
 
-type clientSync struct {
+type clientSync struct { // 消息同步存根
 	msg Order.Message
 }
 

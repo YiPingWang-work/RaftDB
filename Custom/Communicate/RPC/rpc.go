@@ -21,6 +21,10 @@ import (
 		ChangeNetworkDelay(delay int, random bool)
 	}
 */
+/*
+要求rpc将信息推送到Logic层的时候，必须为消息打上全局唯一的标识。
+*/
+
 type RPC struct {
 	clientChans sync.Map
 	replyChan   chan<- Order.Order
@@ -103,7 +107,6 @@ func (r *RPC) Push(rec Order.Message, rep *string) error {
 }
 
 func (r *RPC) Write(rec Order.Message, rep *string) error {
-
 	rec.From = int(r.num.Add(1))
 	ch := make(chan Order.Message, 0)
 	r.clientChans.Store(rec.From, ch)

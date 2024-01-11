@@ -14,6 +14,7 @@ const (
 	add1
 	sub1
 	readAll
+	watch
 )
 
 type kvData struct {
@@ -41,28 +42,36 @@ type KVDB struct {
 	delay time.Duration
 }
 
-func (k *KVDB) Init() {
+func (k *KVDB) Init() func(string) (bool, string, string) {
 	k.data = map[string]string{}
 	k.ChangeProcessDelay(0, false)
+	return func(order string) (bool, string, string) {
+		if op, ok := k.parser(order); ok && op.opType == write {
+			return true, "write" + op.data.key, op.data.val
+		}
+		return false, "", ""
+	}
 }
-func (k *KVDB) Process(in string) (out string, agree bool, err error) {
+func (k *KVDB) Process(in string) (out string, agree bool, watching bool, err error) {
 	log.Printf("KVDB: process: %s\n", in)
 	time.Sleep(k.delay)
 	if x, legal := k.parser(in); !legal {
-		return "db: illegal operation", false, nil
+		return "db: illegal operation", false, false, nil
 	} else {
 		if x.opType == read {
 			if res, ok := k.data[x.data.key]; ok {
-				return "val: " + res, true, nil
+				return res, true, false, nil
 			} else {
-				return "(empty)", true, nil
+				return "(empty)", true, false, nil
 			}
 		} else if x.opType == write {
 			k.data[x.data.key] = x.data.val
-			return "write successfully, key: " + x.data.key + ", value: " + x.data.val, true, nil
+			return "write successfully: " + x.data.key + ", " + x.data.val, true, false, nil
+		} else if x.opType == watch {
+			return x.data.key, true, true, nil
 		}
 	}
-	return in, false, nil
+	return in, false, false, nil
 }
 
 func (k *KVDB) UndoProcess(in string) (out string, agree bool, err error) {
@@ -72,13 +81,14 @@ func (k *KVDB) UndoProcess(in string) (out string, agree bool, err error) {
 
 func (k *KVDB) parser(order string) (op, bool) {
 	res := strings.SplitN(order, " ", 3)
-	if res[0] == "read" && len(res) == 2 {
+	if len(res) == 2 && res[0] == "read" {
 		return op{opType: read, data: kvData{key: res[1]}}, true
-	} else if res[0] == "write" && len(res) == 3 {
+	} else if len(res) == 3 && res[0] == "write" {
 		return op{opType: write, data: kvData{key: res[1], val: res[2]}}, true
-	} else {
-		return op{}, false
+	} else if len(res) == 3 && res[0] == "watch" && res[1] == "write" {
+		return op{opType: watch, data: kvData{key: res[1] + res[2]}}, true
 	}
+	return op{}, false
 }
 
 func (k *KVDB) ChangeProcessDelay(delay int, random bool) {
