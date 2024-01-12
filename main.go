@@ -45,6 +45,10 @@ func Gogo(confPath string, logPath string, medium Bottom.Medium, cable Bottom.Ca
 }
 
 func main() {
+	if len(os.Args) != 3 {
+		log.Println("need config file and history log file")
+		return
+	}
 	confPath, err := filepath.Abs(os.Args[1])
 	if err != nil {
 		log.Println("input error: illegal file")

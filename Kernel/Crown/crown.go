@@ -8,8 +8,7 @@ import (
 
 /*
 上层模块，上层模块会接受来自logic层的消息，并对此作出处理，Crown和Logic之间使用ToCrownChan和FromCrownChan通讯。
-只有客户端的请求会被传送到这里，所以需要对Logic.me中的processClient作出拦截或修正此代码
-（当前实现的是只有leader可以响应客户端请求，同时对客户端的所有请求进行follower同步处理）
+只有客户端的请求会被传送到这里。
 */
 
 type Crown struct {
