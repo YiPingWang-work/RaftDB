@@ -105,7 +105,7 @@
 
 
 
-![img.png](img.png)
+![img.png](README.assets/img.png)
 
 ​	系统采用CS架构。其中服务节点分为三部分，Crown、Logic、bottom，Raft算法被抽象为Logic，通过管道与bottom相连保证系统的低耦合，可以变更bottom的配置适应于不同的应用场景，bottom又封装两个功能模块，通讯模块communicate和存储模块store，分别负责节点与节点、节点与客户端的通讯和日志的存储。客户端提供终端接入的方式，客户调用终端命令完成对日志的存储操作。Crown则是上层服务组件接口，用于承载自定义的数据库
 
