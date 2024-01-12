@@ -101,7 +101,7 @@ func (r *RPC) ReplyClient(msg interface{}) error {
 	return nil
 }
 
-func (r *RPC) Push(rec Order.Message, rep *string) error {
+func (r *RPC) Push(rec Order.Message, _ *string) error {
 	r.replyChan <- Order.Order{Type: Order.FromNode, Msg: rec}
 	return nil
 }

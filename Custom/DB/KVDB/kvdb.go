@@ -11,9 +11,6 @@ import (
 const (
 	write = iota
 	read
-	add1
-	sub1
-	readAll
 	watch
 )
 
