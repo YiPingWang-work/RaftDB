@@ -2,7 +2,7 @@ package main
 
 import (
 	"RaftDB_Client/DB/KVDB"
-	"RaftDB_Client/MsgLog"
+	"RaftDB_Client/Msg"
 	"bufio"
 	"fmt"
 	"net/rpc"
@@ -27,7 +27,7 @@ func main() {
 		if err != nil {
 			fmt.Println(err)
 		}
-		req := MsgLog.Msg{Log: MsgLog.LogType(content), Term: 50000000, Agree: content[1] == 'r'}
+		req := Msg.Msg{Log: Msg.LogType(content), Term: 50000000, Agree: content[1] == 'r'}
 		rep := ""
 		if err := client.Call("RPC.Write", req, &rep); err != nil {
 			fmt.Println(err)

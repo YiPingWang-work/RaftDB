@@ -20,12 +20,12 @@ func (k *KVDBClient) Parser(order string) (string, bool) {
 	}
 Again:
 	if len(res) == 3 && res[0] == "write" {
-		return "write '" + res[1] + "' '" + res[2] + "'", true
+		return "write'" + res[1] + "'" + res[2], true
 	} else if len(res) == 2 {
 		if res[0] == "watch" {
-			return "watch write '" + res[1] + "'", true
+			return "watch'write'" + res[1], true
 		} else if res[0] == "read" {
-			return "read '" + res[1] + "'", true
+			return "read'" + res[1], true
 		}
 		var res2 []string
 		tmp := strings.Split(res[0], " ")
@@ -36,7 +36,7 @@ Again:
 			}
 		}
 		if len(res2) == 2 && res2[0] == "write" {
-			return "write '" + res2[1] + "' '" + res[1] + "'", true
+			return "write'" + res2[1] + "'" + res[1], true
 		}
 	} else if len(res) == 1 {
 		var res2 []string

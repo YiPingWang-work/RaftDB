@@ -13,6 +13,10 @@ import (
 )
 
 /*
+网络实体，本阶段使用RPC进行节点间和节点与客户端之间的通讯
+*/
+
+/*
 	type Cable interface {
 		Init(cableParam interface{}) error
 		ReplyNode(addr string, msg interface{}) error

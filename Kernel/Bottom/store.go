@@ -51,7 +51,7 @@ func (s *Store) initAndLoad(confPath string, filePath string, meta *Meta.Meta, l
 
 func (s *Store) appendLogs(logs *[]Log.Log) error {
 	for _, v := range *logs {
-		if err := s.medium.Append(s.filePath, Log.LogToString(v)); err != nil {
+		if err := s.medium.Append(s.filePath, Log.LogToString(v)+"\n"); err != nil {
 			log.Println(err)
 		}
 	}

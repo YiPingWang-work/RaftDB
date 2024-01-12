@@ -45,7 +45,7 @@ func (k Key) Equals(key Key) bool {
 }
 
 func LogToString(content Log) string {
-	return fmt.Sprintf("%d$%d^%s\n", content.K.Term, content.K.Index, content.V)
+	return fmt.Sprintf("%d$%d^%s", content.K.Term, content.K.Index, content.V)
 }
 
 func StringToLog(v string) (content Log, err error) {

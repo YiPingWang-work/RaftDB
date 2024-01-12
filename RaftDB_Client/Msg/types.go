@@ -1,4 +1,4 @@
-package MsgLog
+package Msg
 
 type MsgType int
 
