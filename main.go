@@ -22,9 +22,9 @@ import (
 // 你可以修改Gogo函数使其完成你的定制化功能
 
 func Gogo(confPath string, logPath string, medium Bottom.Medium, cable Bottom.Cable, app Crown.App) {
-	var bottom Bottom.Bottom                               // 声明通信和存储底座，内部数据结构线程不安全
-	var meta Meta.Meta                                     // 新建元数据，元数据线程不安全
-	var logSet Log.LogSet                                  // 新建日志文件，日志文件线程安全
+	var bottom Bottom.Bottom                               // 声明通信和存储底座，内部数据结构线程安全
+	var meta Meta.Meta                                     // 新建元数据，元数据线程不安全，但只允许Logic层访问
+	var logSet Log.LogSet                                  // 新建日志系统，日志系统线程安全
 	var me Logic.Me                                        // 新建Raft层，内部数据结构线程不安全
 	var crown Crown.Crown                                  // 新建上层应用服务
 	fromBottomChan := make(chan Order.Order, 10000)        // 创建下层通讯管道，管道线程安全
