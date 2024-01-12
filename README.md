@@ -1,4 +1,5 @@
 ## 高可用分布式日志数据库
+## 最新版本在watch分支上
 
 ​																													by YipingWang
 
