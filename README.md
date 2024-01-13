@@ -168,7 +168,10 @@ db.conf文件示例：
 ```
 > cd ./RaftDB_client
 > go build main.go
-> main [leader的IP和端口，例如 localhost:18000] [日志信息，例如 hello]
+> main [leader的IP和端口，例如 localhost:18000]
+> read key1
+> write key1 val1
+> watch key2
 ```
 
 
