@@ -17,6 +17,7 @@ func main() {
 	}
 	addr := os.Args[1]
 	for {
+		fmt.Printf("> ")
 		order, _ := bufio.NewReader(os.Stdin).ReadString('\n')
 		content, ok := db.Parser(order)
 		if !ok {
