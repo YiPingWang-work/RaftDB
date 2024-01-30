@@ -7,7 +7,6 @@ import (
 	"RaftDB/Kernel/Pipe/Something"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"time"
 )
@@ -159,22 +158,22 @@ func (m *Me) Run() {
 				}
 				continue
 			}
+			if !sth.NeedSync {
+				m.toBottomChan <- Order.Order{Type: Order.ClientReply, Msg: Order.Message{From: id, Log: sth.Content}}
+				continue
+			}
 			if msg, has := m.clientSyncIdMsgMap[id]; has {
 				if err := m.role.processClientSync(msg, m); err != nil {
 					log.Println(err)
+					m.toBottomChan <- Order.Order{Type: Order.ClientReply,
+						Msg: Order.Message{From: id, Log: "operated but logic refuses to sync"}}
 					delete(m.clientSyncIdMsgMap, id)
 				} else {
 					m.clientSyncIdMsgMap[id] = Order.Message{From: id, Log: sth.Content}
-					continue
 				}
-			} else if !sth.NeedSync {
-				m.toBottomChan <- Order.Order{Type: Order.ClientReply, Msg: Order.Message{From: id, Log: sth.Content}}
-				continue
 			} else {
-				fmt.Println("error: leader can not sync, response lose")
+				panic("lose client msg")
 			}
-			m.toBottomChan <- Order.Order{Type: Order.ClientReply,
-				Msg: Order.Message{From: id, Log: "operated but logic refuses to sync"}}
 		case id, opened := <-m.clientSyncFinishedChan:
 			if !opened {
 				panic("me.clientSyncFinishedChan closed")
@@ -183,7 +182,7 @@ func (m *Me) Run() {
 				m.toBottomChan <- Order.Order{Type: Order.ClientReply, Msg: msg}
 				delete(m.clientSyncIdMsgMap, id)
 			} else {
-				panic("lose client response")
+				panic("lose client msg")
 			}
 		}
 	}
