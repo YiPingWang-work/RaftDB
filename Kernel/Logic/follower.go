@@ -178,14 +178,14 @@ func (f *Follower) processPreVoteReply(Order.Message, *Me) error {
 func (f *Follower) processFromClient(msg Order.Message, me *Me) error {
 	log.Printf("Follower: a msg from client: %v\n", msg)
 	if msg.Agree {
-		return errors.New("error: follower refuses to sync")
+		return errors.New("warning: follower refuses to sync")
 	}
 	me.toCrownChan <- Something.Something{Id: msg.From, NeedReply: true, NeedSync: false, Content: msg.Log}
 	return nil
 }
 
 func (f *Follower) processClientSync(Order.Message, *Me) error {
-	return errors.New("error: follower can not do sync")
+	return errors.New("warning: follower can not do sync")
 }
 
 func (f *Follower) processTimeout(me *Me) error {

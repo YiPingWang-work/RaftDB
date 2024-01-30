@@ -7,6 +7,7 @@ import (
 	"RaftDB/Kernel/Pipe/Something"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"time"
 )
@@ -170,7 +171,7 @@ func (m *Me) Run() {
 				m.toBottomChan <- Order.Order{Type: Order.ClientReply, Msg: Order.Message{From: id, Log: sth.Content}}
 				continue
 			} else {
-				log.Println("error: leader can not sync")
+				fmt.Println("error: leader can not sync, response lose")
 			}
 			m.toBottomChan <- Order.Order{Type: Order.ClientReply,
 				Msg: Order.Message{From: id, Log: "operated but logic refuses to sync"}}
