@@ -90,7 +90,9 @@ func (l *Leader) processAppendLogReply(msg Order.Message, me *Me) error {
 						me.clientSyncFinishedChan <- id
 						delete(me.clientSyncKeyIdMap, v)
 					}
-					delete(l.agreeMap, v)
+					if _, has := l.agreeMap[v]; has {
+						delete(l.agreeMap, v)
+					}
 				}
 				reply.To = me.members
 				me.timer = time.After(me.leaderHeartbeat)
