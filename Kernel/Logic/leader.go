@@ -123,7 +123,7 @@ func (l *Leader) processAppendLogReply(msg Order.Message, me *Me) error {
 		var err error
 		reply.SecondLastLogKey = msg.SecondLastLogKey
 		reply.LastLogKey, err = me.logSet.GetNext(reply.SecondLastLogKey)
-		if err != nil {
+		if err != nil { // 如果无法获得返回值的key，也就是这是一个废弃的key，那么leader将尝试自己的上一个key
 			reply.LastLogKey, _ = me.logSet.GetPrevious(msg.LastLogKey)
 			reply.SecondLastLogKey, _ = me.logSet.GetPrevious(reply.LastLogKey)
 		}

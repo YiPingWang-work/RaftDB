@@ -106,10 +106,7 @@ func (l *LogSet) Append(content Log) { // 幂等的增加日志
 	l.m.Unlock()
 }
 
-func (l *LogSet) GetPrevious(key Key) (Key, error) { // 如果key不存在，返回-1-1
-	if key.Term == -1 {
-		return Key{-1, -1}, errors.New("this key has no previous key")
-	}
+func (l *LogSet) GetPrevious(key Key) (Key, error) { // 如果key不存在，报错，如果不存在上一个返回-1-1
 	l.m.RLock()
 	res := Key{Term: -1, Index: -1}
 	if l.Iterator(key) == -1 {
@@ -132,10 +129,7 @@ func (l *LogSet) GetPrevious(key Key) (Key, error) { // 如果key不存在，返
 	return res, nil
 }
 
-func (l *LogSet) GetNext(key Key) (Key, error) { // 如果key不存在，返回-1-1
-	if !key.Less(l.GetLast()) {
-		return Key{-1, -1}, errors.New("this key has no next key")
-	}
+func (l *LogSet) GetNext(key Key) (Key, error) { // 如果key不存在，报错，如果key没有下一个返回-1-1
 	l.m.RLock()
 	res := Key{Term: -1, Index: -1}
 	if key.Equals(Key{-1, -1}) && len(l.logs) > 0 {
