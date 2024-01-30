@@ -64,6 +64,11 @@ func (f *Follower) processAppendLog(msg Order.Message, me *Me) error {
 		} else {
 			for _, v := range contents {
 				me.toCrownChan <- Something.Something{NeedReply: false, Content: "!" + v.V}
+				if id, has := me.clientSyncKeyIdMap[v.K]; has {
+					me.clientSyncIdMsgMap[id] = Order.Message{From: id, Log: "all rollback"}
+					me.clientSyncFinishedChan <- id
+					delete(me.clientSyncKeyIdMap, v.K)
+				}
 			}
 		}
 		log.Printf("Follower: receive a less log %v from %d, remove logSet until last log is %v\n",
@@ -114,6 +119,12 @@ func (f *Follower) processCommit(msg Order.Message, me *Me) error {
 			SecondLastLogKey: k,
 		}}
 	me.timer = time.After(me.followerTimeout)
+	for _, v := range me.logSet.GetKsByRange(k, me.logSet.GetCommitted()) {
+		if id, has := me.clientSyncKeyIdMap[v]; has {
+			me.clientSyncFinishedChan <- id
+			delete(me.clientSyncKeyIdMap, v)
+		}
+	}
 	log.Printf("Follower: commit logSet whose key from %v to %v\n",
 		k, me.logSet.GetCommitted())
 	return nil

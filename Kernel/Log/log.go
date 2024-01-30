@@ -219,7 +219,7 @@ func (l *LogSet) Remove(key Key) ([]Log, error) { // 删除日志直到自己的
 			return ret, err
 		}
 		ret = make([]Log, len(l.logs)-left-1)
-		copy(l.logs[left+1:len(l.logs)], ret)
+		copy(ret, l.logs[left+1:len(l.logs)])
 		l.logs = l.logs[0 : left+1]
 	} else {
 		if !l.committedKey.Equals(Key{-1, -1}) {

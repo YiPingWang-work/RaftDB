@@ -30,7 +30,7 @@ import (
 	3.3.如果commit的最低消息都比这个消息高，那么回复同步失败。
 	3.4.除上述之外，如果commit的消息中无这个消息，那么回复同步失败。
 
-这么做的意义是：将nodes之间的通讯和node和clienr之间的通讯解耦，对于不需同步的任务，所有的角色操作方式都是一致的，
+这么做的意义是：将nodes之间的通讯和node和client之间的通讯解耦，对于不需同步的任务，所有的角色操作方式都是一致的，
 对于需要同步的任务来说，本方案将其分离为顺序执行的两个过程，第一个过程就是一个不需要同步的过程，第一个过程结束后将第一个过程的结果进行记录。保存起来，
 如果环境允许（属于leader状态）则进入第二个同步过程，第二个同步过程中可能进行了许多次环境更迭，但是只要最后产生了结果，就要返回，
 因为针对客户端的这次消息，是唯一对应一个logKey的，此时对于me来说，只要它提交了logkey的报文，就说明这个任务已经同步了，完全可以正常返回，
@@ -49,16 +49,13 @@ type Me struct {
 	fromCrownChan           <-chan Something.Something // 上层接口
 	toCrownChan             chan<- Something.Something // 上层接口
 	clientSyncFinishedChan  chan int                   // 客户端同步处理完成通知
-	clientSyncMap           map[int]clientSync         // clientSyncMap只会保存leader在本轮任期内需要同步的消息
+	clientSyncIdMsgMap      map[int]Order.Message      // clientSyncMap是clientId -> msg的映射
+	clientSyncKeyIdMap      map[Log.Key]int            // clientSyncKeyIdMap是成功进入同步处理的logKsy -> clientId的映射
 	logSet                  *Log.LogSet                // 日志指针
 	leaderHeartbeat         time.Duration              // leader心跳间隔
 	followerTimeout         time.Duration              // follower超时时间
 	candidatePreVoteTimeout time.Duration              // candidate预选举超时
 	candidateVoteTimeout    time.Duration              // candidate选举超时
-}
-
-type clientSync struct { // 消息同步存根
-	msg Order.Message
 }
 
 /*
@@ -95,6 +92,8 @@ func (m *Me) Init(meta *Meta.Meta, logSet *Log.LogSet,
 	m.fromBottomChan, m.toBottomChan = fromBottomChan, toBottomChan
 	m.fromCrownChan, m.toCrownChan = fromCrownChan, toCrownChan
 	m.clientSyncFinishedChan = make(chan int, 100000)
+	m.clientSyncIdMsgMap = map[int]Order.Message{}
+	m.clientSyncKeyIdMap = map[Log.Key]int{}
 	m.members, m.quorum = make([]int, meta.Num), meta.Num/2
 	for i := 0; i < meta.Num; i++ {
 		m.members[i] = i
@@ -156,22 +155,17 @@ func (m *Me) Run() {
 				*/
 				m.toBottomChan <- Order.Order{Type: Order.ClientReply,
 					Msg: Order.Message{From: id, Log: sth.Content}}
-				if _, has := m.clientSyncMap[id]; has {
-					delete(m.clientSyncMap, id)
+				if _, has := m.clientSyncIdMsgMap[id]; has {
+					delete(m.clientSyncIdMsgMap, id)
 				}
 				continue
 			}
-			/*
-				如果这是一个同步请求并且在同步消息映射表中还能找i得到，同时当前的角色是leader，说明这是一个当前leader处理的同时是需要同步的消息，则进行同步处理。
-				如果这是一个不需要同步的请求，则直接返回客户端消息.
-				否则这是一个过期的需要同步的请求，但资源已经被销毁，应给是上周目的历史消息，这周目的me给出相应的错误响应。
-			*/
-			if csp, has := m.clientSyncMap[id]; has {
-				if err := m.role.processClientSync(csp.msg, m); err != nil {
+			if msg, has := m.clientSyncIdMsgMap[id]; has {
+				if err := m.role.processClientSync(msg, m); err != nil {
 					log.Println(err)
-					delete(m.clientSyncMap, id)
+					delete(m.clientSyncIdMsgMap, id)
 				} else {
-					m.clientSyncMap[id] = clientSync{msg: Order.Message{From: id, Log: sth.Content}}
+					m.clientSyncIdMsgMap[id] = Order.Message{From: id, Log: sth.Content}
 					continue
 				}
 			} else if !sth.NeedSync {
@@ -186,15 +180,11 @@ func (m *Me) Run() {
 			if !opened {
 				panic("me.clientSyncFinishedChan closed")
 			}
-			/*
-				说明本条消息同步成功，但如果此时me是下周目的，那么它将不知道回复是什么，但是会告诉客户端成功执行，只不过不知道crown的回复。
-			*/
-			if csp, has := m.clientSyncMap[id]; has {
-				m.toBottomChan <- Order.Order{Type: Order.ClientReply, Msg: csp.msg}
-				delete(m.clientSyncMap, id)
+			if msg, has := m.clientSyncIdMsgMap[id]; has {
+				m.toBottomChan <- Order.Order{Type: Order.ClientReply, Msg: msg}
+				delete(m.clientSyncIdMsgMap, id)
 			} else {
-				m.toBottomChan <- Order.Order{Type: Order.ClientReply,
-					Msg: Order.Message{From: id, Log: "operated and synced but don't know result"}}
+				panic("lose client response")
 			}
 		}
 	}
@@ -237,7 +227,6 @@ func (m *Me) processFromNode(msg Order.Message) error {
 
 /*
 切换为follower，如果还有余下的消息没处理按照follower逻辑处理这些消息。
-当切换为Follower的时候，会开启客户端权限，也就是通知bottom允许客户端连接。
 */
 
 func (m *Me) switchToFollower(term int, has bool, msg Order.Message) error {
@@ -262,20 +251,16 @@ func (m *Me) switchToFollower(term int, has bool, msg Order.Message) error {
 
 /*
 切换为leader。
-当切换为leader的时候会开启客户端权限，也就是通知bottom可以接受客户端的连接请求。
-新一轮的leader会重置自己的clientSyncMap。
 */
 
 func (m *Me) switchToLeader() error {
 	log.Printf("==== switch to leader, my term is %d ====\n", m.meta.Term)
 	m.role = &leader
-	m.clientSyncMap = map[int]clientSync{}
 	return m.role.init(m)
 }
 
 /*
 切换为candidate。
-当切换为Follower的时候，会关闭客户端权限，也就是通知bottom禁止客户端连接。
 */
 
 func (m *Me) switchToCandidate() error {

@@ -24,7 +24,6 @@ type Leader struct {
 
 type fc struct {
 	followers map[int]bool
-	client    int
 }
 
 /*
@@ -87,7 +86,10 @@ func (l *Leader) processAppendLogReply(msg Order.Message, me *Me) error {
 					SecondLastLogKey: secondLastKey,
 				}}
 				for _, v := range me.logSet.GetKsByRange(secondLastKey, msg.LastLogKey) {
-					me.clientSyncFinishedChan <- l.agreeMap[v].client
+					if id, has := me.clientSyncKeyIdMap[v]; has {
+						me.clientSyncFinishedChan <- id
+						delete(me.clientSyncKeyIdMap, v)
+					}
 					delete(l.agreeMap, v)
 				}
 				reply.To = me.members
@@ -165,7 +167,7 @@ func (l *Leader) processPreVoteReply(Order.Message, *Me) error {
 func (l *Leader) processFromClient(msg Order.Message, me *Me) error {
 	log.Printf("Leader: a msg from client: %v\n", msg)
 	if msg.Agree {
-		me.clientSyncMap[msg.From] = clientSync{msg: msg}
+		me.clientSyncIdMsgMap[msg.From] = msg
 	}
 	me.toCrownChan <- Something.Something{Id: msg.From, NeedReply: true, NeedSync: msg.Agree, Content: msg.Log}
 	return nil
@@ -174,8 +176,9 @@ func (l *Leader) processFromClient(msg Order.Message, me *Me) error {
 func (l *Leader) processClientSync(msg Order.Message, me *Me) error {
 	secondLastKey := me.logSet.GetLast()
 	lastLogKey := Log.Key{Term: me.meta.Term, Index: l.index}
+	me.clientSyncKeyIdMap[lastLogKey] = msg.From
 	me.logSet.Append(Log.Log{K: lastLogKey, V: msg.Log})
-	l.agreeMap[lastLogKey] = fc{followers: map[int]bool{}, client: msg.From}
+	l.agreeMap[lastLogKey] = fc{followers: map[int]bool{}}
 	me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Message{
 		Type:             Order.AppendLog,
 		From:             me.meta.Id,
@@ -217,7 +220,7 @@ func (l *Leader) processExpansionReply(Order.Message, *Me) error {
 func (l *Leader) ToString() string {
 	res := fmt.Sprintf("==== LEADER ====\nindex: %d\nagreedReply:\n", l.index)
 	for k, v := range l.agreeMap {
-		s := fmt.Sprintf("	from: %d, key: {%d %d} -> ", v.client, k.Term, k.Index)
+		s := fmt.Sprintf("	key: {%d %d} -> ", k.Term, k.Index)
 		for k2 := range v.followers {
 			s += fmt.Sprintf("%d ", k2)
 		}

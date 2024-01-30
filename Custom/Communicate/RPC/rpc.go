@@ -106,6 +106,7 @@ func (r *RPC) ReplyClient(msg interface{}) error {
 }
 
 func (r *RPC) Push(rec Order.Message, _ *string) error {
+	time.Sleep(r.delay)
 	r.replyChan <- Order.Order{Type: Order.FromNode, Msg: rec}
 	return nil
 }
