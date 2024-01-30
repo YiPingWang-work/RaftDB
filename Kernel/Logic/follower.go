@@ -105,16 +105,17 @@ func (f *Follower) processCommit(msg Order.Message, me *Me) error {
 	} else {
 		me.toBottomChan <- Order.Order{Type: Order.Store, Msg: Order.Message{Agree: true, Log: string(metaTmp)}}
 	}
+	k, _ := me.logSet.GetNext(previousCommitted)
 	me.toBottomChan <- Order.Order{
 		Type: Order.Store,
 		Msg: Order.Message{
 			Agree:            false,
 			LastLogKey:       me.logSet.GetCommitted(),
-			SecondLastLogKey: me.logSet.GetNext(previousCommitted),
+			SecondLastLogKey: k,
 		}}
 	me.timer = time.After(me.followerTimeout)
 	log.Printf("Follower: commit logSet whose key from %v to %v\n",
-		me.logSet.GetNext(previousCommitted), me.logSet.GetCommitted())
+		k, me.logSet.GetCommitted())
 	return nil
 }
 

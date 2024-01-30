@@ -106,12 +106,12 @@ func (l *LogSet) Append(content Log) { // 幂等的增加日志
 	l.m.Unlock()
 }
 
-func (l *LogSet) GetPrevious(key Key) Key { // 如果key不存在，返回-1-1
+func (l *LogSet) GetPrevious(key Key) (Key, error) { // 如果key不存在，返回-1-1
 	l.m.RLock()
 	res := Key{Term: -1, Index: -1}
 	if l.Iterator(key) == -1 {
 		l.m.RUnlock()
-		return res
+		return res, errors.New("wrong key")
 	}
 	left, right := 0, len(l.logs)-1
 	for left < right {
@@ -126,19 +126,19 @@ func (l *LogSet) GetPrevious(key Key) Key { // 如果key不存在，返回-1-1
 		res = l.logs[left].K
 	}
 	l.m.RUnlock()
-	return res
+	return res, nil
 }
 
-func (l *LogSet) GetNext(key Key) Key { // 如果key不存在，返回-1-1
+func (l *LogSet) GetNext(key Key) (Key, error) { // 如果key不存在，返回-1-1
 	l.m.RLock()
 	res := Key{Term: -1, Index: -1}
 	if key.Equals(Key{-1, -1}) && len(l.logs) > 0 {
 		l.m.RUnlock()
-		return l.logs[0].K
+		return l.logs[0].K, nil
 	}
 	if l.Iterator(key) == -1 {
 		l.m.RUnlock()
-		return res
+		return res, errors.New("wrong key")
 	}
 	left, right := 0, len(l.logs)-1
 	for left < right {
@@ -153,7 +153,7 @@ func (l *LogSet) GetNext(key Key) Key { // 如果key不存在，返回-1-1
 		res = l.logs[left].K
 	}
 	l.m.RUnlock()
-	return res
+	return res, nil
 }
 
 func (l *LogSet) GetVByK(key Key) (string, error) { // 通过Key寻找指定日志，找不到返回空

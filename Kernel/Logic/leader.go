@@ -80,7 +80,7 @@ func (l *Leader) processAppendLogReply(msg Order.Message, me *Me) error {
 					me.toBottomChan <- Order.Order{Type: Order.Store, Msg: Order.Message{Agree: true, Log: string(metaTmp)}}
 				}
 				previousCommitted := me.logSet.Commit(msg.LastLogKey)
-				secondLastKey := me.logSet.GetNext(previousCommitted)
+				secondLastKey, _ := me.logSet.GetNext(previousCommitted)
 				me.toBottomChan <- Order.Order{Type: Order.Store, Msg: Order.Message{
 					Agree:            false,
 					LastLogKey:       msg.LastLogKey,
@@ -98,7 +98,7 @@ func (l *Leader) processAppendLogReply(msg Order.Message, me *Me) error {
 		/*
 			如果这条日志不是leader最新的日志，则尝试发送这条日志的下一条给源follower
 		*/
-		nextKey := me.logSet.GetNext(msg.LastLogKey)
+		nextKey, _ := me.logSet.GetNext(msg.LastLogKey)
 		if nextKey.Term != -1 {
 			req, err := me.logSet.GetVByK(nextKey)
 			if err != nil {
@@ -120,10 +120,16 @@ func (l *Leader) processAppendLogReply(msg Order.Message, me *Me) error {
 		/*
 			如果不同意这条消息，发送follower回复的最新消息的下一条（follower的最新消息在msg.SecondLastLogKey中携带）
 		*/
+		var err error
 		reply.SecondLastLogKey = msg.SecondLastLogKey
-		reply.LastLogKey = me.logSet.GetNext(reply.SecondLastLogKey)
-		if reply.LastLogKey.Term == -1 {
-			return errors.New("error: follower request wrong log")
+		reply.LastLogKey, err = me.logSet.GetNext(reply.SecondLastLogKey)
+		if err != nil {
+			if reply.LastLogKey, err = me.logSet.GetPrevious(msg.LastLogKey); err != nil {
+				return err
+			}
+			if reply.SecondLastLogKey, err = me.logSet.GetPrevious(reply.LastLogKey); err != nil {
+				return err
+			}
 		}
 		reply.Type, reply.To = Order.AppendLog, []int{msg.From}
 		if req, err := me.logSet.GetVByK(reply.LastLogKey); err != nil {
