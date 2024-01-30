@@ -124,12 +124,8 @@ func (l *Leader) processAppendLogReply(msg Order.Message, me *Me) error {
 		reply.SecondLastLogKey = msg.SecondLastLogKey
 		reply.LastLogKey, err = me.logSet.GetNext(reply.SecondLastLogKey)
 		if err != nil {
-			if reply.LastLogKey, err = me.logSet.GetPrevious(msg.LastLogKey); err != nil {
-				return err
-			}
-			if reply.SecondLastLogKey, err = me.logSet.GetPrevious(reply.LastLogKey); err != nil {
-				return err
-			}
+			reply.LastLogKey, _ = me.logSet.GetPrevious(msg.LastLogKey)
+			reply.SecondLastLogKey, _ = me.logSet.GetPrevious(reply.LastLogKey)
 		}
 		reply.Type, reply.To = Order.AppendLog, []int{msg.From}
 		if req, err := me.logSet.GetVByK(reply.LastLogKey); err != nil {
