@@ -34,7 +34,7 @@ type RPC struct {
 	replyChan       chan<- Order.Order
 	delay           time.Duration
 	num             atomic.Int32
-	alwaysConnPools map[string]sync.Pool
+	alwaysConnPools map[string]*sync.Pool
 }
 
 func (r *RPC) Init(replyChan interface{}, alwaysIp []string) error {
@@ -48,10 +48,10 @@ func (r *RPC) Init(replyChan interface{}, alwaysIp []string) error {
 	if err := rpc.RegisterName("RPC", r); err != nil {
 		return err
 	}
-	r.alwaysConnPools = map[string]sync.Pool{}
+	r.alwaysConnPools = map[string]*sync.Pool{}
 	for _, v := range alwaysIp {
 		ip := v
-		r.alwaysConnPools[v] = sync.Pool{
+		r.alwaysConnPools[v] = &sync.Pool{
 			New: func() interface{} {
 				client, err := rpc.Dial("tcp", ip)
 				if err != nil {
@@ -65,7 +65,7 @@ func (r *RPC) Init(replyChan interface{}, alwaysIp []string) error {
 	return nil
 }
 
-func (r *RPC) ReplyNode_old_versioin(addr string, msg interface{}) error {
+func (r *RPC) ReplyNode_old_version(addr string, msg interface{}) error {
 	if x, ok := msg.(Order.Message); !ok {
 		return errors.New("RPC: ReplyNode need a Order.Message")
 	} else {

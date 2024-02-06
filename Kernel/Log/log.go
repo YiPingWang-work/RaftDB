@@ -284,7 +284,7 @@ func (l *LogSet) GetAll() []Log { // 线程不安全
 
 func (l *LogSet) ToString() string {
 	l.m.RLock()
-	res := fmt.Sprintf("==== logs ====\ncontents: %v\ncommittedKey: %v\n==== logs ====", l.logs, l.committedKey)
+	res := fmt.Sprintf("==== logs %d ====\ncontents: %v\ncommittedKey: %v\n==== logs ====", len(l.logs), l.logs, l.committedKey)
 	l.m.RUnlock()
 	return res
 }

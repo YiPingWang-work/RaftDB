@@ -76,7 +76,7 @@ func (k *KVDB) Process(in string) (out string, agree bool, watching bool, err er
 }
 
 func (k *KVDB) UndoProcess(in string) (out string, agree bool, err error) {
-	fmt.Printf("============================== !!%s\n", in)
+	fmt.Printf("!! redo %s\n", in)
 	return in, true, nil
 }
 
@@ -101,7 +101,7 @@ func (k *KVDB) ChangeProcessDelay(delay int, random bool) {
 }
 
 func (k *KVDB) ToString() string {
-	u := "kvdb: "
+	u := fmt.Sprintf("kvdb: %d", len(k.data))
 	for i, v := range k.data {
 		u += fmt.Sprintf("\nk: %s v: %s", i, v)
 	}
