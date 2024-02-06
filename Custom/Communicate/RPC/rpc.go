@@ -3,7 +3,6 @@ package RPC
 import (
 	"RaftDB/Kernel/Pipe/Order"
 	"errors"
-	"fmt"
 	"log"
 	"math/rand"
 	"net"
@@ -66,7 +65,7 @@ func (r *RPC) Init(replyChan interface{}, alwaysIp []string) error {
 	return nil
 }
 
-func (r *RPC) ReplyNode1(addr string, msg interface{}) error {
+func (r *RPC) ReplyNode_old_versioin(addr string, msg interface{}) error {
 	if x, ok := msg.(Order.Message); !ok {
 		return errors.New("RPC: ReplyNode need a Order.Message")
 	} else {
@@ -84,7 +83,6 @@ func (r *RPC) ReplyNode1(addr string, msg interface{}) error {
 }
 
 func (r *RPC) ReplyNode(addr string, msg interface{}) error {
-	fmt.Println("---", addr)
 	if x, ok := msg.(Order.Message); !ok {
 		return errors.New("RPC: ReplyNode need a Order.Message")
 	} else {
