@@ -86,9 +86,9 @@ func (l *Leader) processAppendLogReply(msg Order.Message, me *Me) error {
 					SecondLastLogKey: secondLastKey,
 				}}
 				for _, v := range me.logSet.GetKsByRange(secondLastKey, msg.LastLogKey) {
-					if id, has := me.clientSyncKeyIdMap[v]; has {
-						me.clientSyncFinishedChan <- id
-						delete(me.clientSyncKeyIdMap, v)
+					if id, has := me.syncKeyIdMap[v]; has {
+						me.syncFinishedChan <- id
+						delete(me.syncKeyIdMap, v)
 					}
 					if _, has := l.agreeMap[v]; has {
 						delete(l.agreeMap, v)
@@ -169,16 +169,21 @@ func (l *Leader) processPreVoteReply(Order.Message, *Me) error {
 func (l *Leader) processFromClient(msg Order.Message, me *Me) error {
 	log.Printf("Leader: a msg from client: %v\n", msg)
 	if msg.Agree {
-		me.clientSyncIdMsgMap[msg.From] = msg
+		me.syncIdMsgMap[msg.From] = msg
 	}
 	me.toCrownChan <- Something.Something{Id: msg.From, NeedReply: true, NeedSync: msg.Agree, Content: msg.Log}
 	return nil
 }
 
+/*
+记录日志的时机是上层成功执行一次同步操作后返回给logic层，logic层开始同步的时刻。只要内存中记录了日志，那么这条日志一定是操作在本节点过的。
+上层一定操作过了这条日志。
+*/
+
 func (l *Leader) processClientSync(msg Order.Message, me *Me) error {
 	secondLastKey := me.logSet.GetLast()
 	lastLogKey := Log.Key{Term: me.meta.Term, Index: l.index}
-	me.clientSyncKeyIdMap[lastLogKey] = msg.From
+	me.syncKeyIdMap[lastLogKey] = msg.From
 	me.logSet.Append(Log.Log{K: lastLogKey, V: msg.Log})
 	l.agreeMap[lastLogKey] = fc{followers: map[int]bool{}}
 	me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: Order.Message{

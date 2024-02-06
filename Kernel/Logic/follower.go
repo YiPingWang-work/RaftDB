@@ -64,10 +64,10 @@ func (f *Follower) processAppendLog(msg Order.Message, me *Me) error {
 		} else {
 			for _, v := range contents {
 				me.toCrownChan <- Something.Something{NeedReply: false, Content: "!" + v.V}
-				if id, has := me.clientSyncKeyIdMap[v.K]; has {
-					me.clientSyncIdMsgMap[id] = Order.Message{From: id, Log: "all rollback"}
-					me.clientSyncFinishedChan <- id
-					delete(me.clientSyncKeyIdMap, v.K)
+				if id, has := me.syncKeyIdMap[v.K]; has {
+					me.syncIdMsgMap[id] = Order.Message{From: id, Log: "sync failed, rollback later"}
+					me.syncFinishedChan <- id
+					delete(me.syncKeyIdMap, v.K)
 				}
 			}
 		}
@@ -120,9 +120,9 @@ func (f *Follower) processCommit(msg Order.Message, me *Me) error {
 		}}
 	me.timer = time.After(me.followerTimeout)
 	for _, v := range me.logSet.GetKsByRange(k, me.logSet.GetCommitted()) {
-		if id, has := me.clientSyncKeyIdMap[v]; has {
-			me.clientSyncFinishedChan <- id
-			delete(me.clientSyncKeyIdMap, v)
+		if id, has := me.syncKeyIdMap[v]; has {
+			me.syncFinishedChan <- id
+			delete(me.syncKeyIdMap, v)
 		}
 	}
 	log.Printf("Follower: commit logSet whose key from %v to %v\n",

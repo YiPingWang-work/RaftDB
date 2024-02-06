@@ -12,7 +12,7 @@ import (
 )
 
 /*
-重新改进一下，节点交互与节点和客户交互分离：【实现，现在实现的有缺陷，可能会导致永久阻塞等】
+重新改进一下，节点交互与节点和客户交互分离：【实现，现在实现的可能有缺陷】
 1.接收一个客户端请求：
 	1.1.如果是不需同步的请求，请求都会直接发往上层
 	1.2.如果是需要同步的，同时me的状态是leader，则发往上层
@@ -26,7 +26,8 @@ import (
 都会查看这个提交的key和自己记录的映射中的信息，
 需要维护发送给响应客户端的信息。
 	3.1.如果commit的消息中有这条消息，则通知客户端完成。
-	3.2.如果触发日志删除，则通知客户端失败（对于一个回滚操作，它一定会执行完，因为一定有东西回滚，所以不需要校验回滚操作的结果（回滚操作必须全部保证执行成功））
+	3.2.如果触发日志删除，则通知客户端失败（对于一个回滚操作，它一定会执行完，因为这个节点一个执行过该回滚操作对应的原操作，否则不会在日志中显示，
+事实上，所有的需要同步的操作/写操作如果成功在本节点执行了都会记录内存日志）
 
 这么做的意义是：将nodes之间的通讯和node和client之间的通讯解耦，对于不需同步的任务，所有的角色操作方式都是一致的，
 对于需要同步的任务来说，本方案将其分离为顺序执行的两个过程，第一个过程就是一个不需要同步的过程，第一个过程结束后将第一个过程的结果进行记录。保存起来，
@@ -50,9 +51,9 @@ type Me struct {
 	toBottomChan            chan<- Order.Order         // 发送消息给bottom的管道
 	fromCrownChan           <-chan Something.Something // 上层接口
 	toCrownChan             chan<- Something.Something // 上层接口
-	clientSyncFinishedChan  chan int                   // 客户端同步处理完成通知
-	clientSyncIdMsgMap      map[int]Order.Message      // clientSyncMap是clientId -> msg的映射
-	clientSyncKeyIdMap      map[Log.Key]int            // clientSyncKeyIdMap是成功进入同步处理的logKsy -> clientId的映射
+	syncFinishedChan        chan int                   // 客户端同步处理完成通知
+	syncIdMsgMap            map[int]Order.Message      // clientSyncMap是clientId -> msg的映射
+	syncKeyIdMap            map[Log.Key]int            // clientSyncKeyIdMap是成功进入同步处理的logKsy -> clientId的映射
 	logSet                  *Log.LogSet                // 日志指针
 	leaderHeartbeat         time.Duration              // leader心跳间隔
 	followerTimeout         time.Duration              // follower超时时间
@@ -93,9 +94,9 @@ func (m *Me) Init(meta *Meta.Meta, logSet *Log.LogSet,
 	m.meta, m.logSet = meta, logSet
 	m.fromBottomChan, m.toBottomChan = fromBottomChan, toBottomChan
 	m.fromCrownChan, m.toCrownChan = fromCrownChan, toCrownChan
-	m.clientSyncFinishedChan = make(chan int, 100000)
-	m.clientSyncIdMsgMap = map[int]Order.Message{}
-	m.clientSyncKeyIdMap = map[Log.Key]int{}
+	m.syncFinishedChan = make(chan int, 100000)
+	m.syncIdMsgMap = map[int]Order.Message{}
+	m.syncKeyIdMap = map[Log.Key]int{}
 	m.members, m.quorum = make([]int, meta.Num), meta.Num/2
 	for i := 0; i < meta.Num; i++ {
 		m.members[i] = i
@@ -157,8 +158,8 @@ func (m *Me) Run() {
 				*/
 				m.toBottomChan <- Order.Order{Type: Order.ClientReply,
 					Msg: Order.Message{From: id, Log: sth.Content}}
-				if _, has := m.clientSyncIdMsgMap[id]; has {
-					delete(m.clientSyncIdMsgMap, id)
+				if _, has := m.syncIdMsgMap[id]; has {
+					delete(m.syncIdMsgMap, id)
 				}
 				continue
 			}
@@ -166,25 +167,25 @@ func (m *Me) Run() {
 				m.toBottomChan <- Order.Order{Type: Order.ClientReply, Msg: Order.Message{From: id, Log: sth.Content}}
 				continue
 			}
-			if msg, has := m.clientSyncIdMsgMap[id]; has {
+			if msg, has := m.syncIdMsgMap[id]; has {
 				if err := m.role.processClientSync(msg, m); err != nil {
 					log.Println(err)
 					m.toBottomChan <- Order.Order{Type: Order.ClientReply,
-						Msg: Order.Message{From: id, Log: "operated but logic refuses to sync"}}
-					delete(m.clientSyncIdMsgMap, id)
+						Msg: Order.Message{From: id, Log: "operated but logic refuses to sync, rollback later"}}
+					delete(m.syncIdMsgMap, id)
 				} else {
-					m.clientSyncIdMsgMap[id] = Order.Message{From: id, Log: sth.Content}
+					m.syncIdMsgMap[id] = Order.Message{From: id, Log: sth.Content}
 				}
 			} else {
 				panic("lose client msg")
 			}
-		case id, opened := <-m.clientSyncFinishedChan:
+		case id, opened := <-m.syncFinishedChan:
 			if !opened {
-				panic("me.clientSyncFinishedChan closed")
+				panic("me.syncFinishedChan closed")
 			}
-			if msg, has := m.clientSyncIdMsgMap[id]; has {
+			if msg, has := m.syncIdMsgMap[id]; has {
 				m.toBottomChan <- Order.Order{Type: Order.ClientReply, Msg: msg}
-				delete(m.clientSyncIdMsgMap, id)
+				delete(m.syncIdMsgMap, id)
 			} else {
 				panic("lose client msg")
 			}
