@@ -15,7 +15,7 @@ type Communicate struct {
 */
 
 type Cable interface {
-	Init(cableParam interface{}) error
+	Init(cableParam interface{}, alwaysIp []string) error
 	ReplyNode(addr string, msg interface{}) error
 	Listen(addr string) error
 	ReplyClient(msg interface{}) error
@@ -28,18 +28,18 @@ type Cable interface {
 
 func (c *Communicate) init(cable Cable, addr string, dns []string, cableParam interface{}) error {
 	c.cable, c.addr, c.dns = cable, addr, dns
-	return c.cable.Init(cableParam)
+	return c.cable.Init(cableParam, dns)
 }
 
-func (c *Communicate) replyNode(msg Order.Message) (err error) {
+func (c *Communicate) replyNode(msg Order.Message) error {
 	for _, v := range msg.To {
 		if addr := c.dns[v]; addr != c.addr {
 			go func() {
-				err = c.cable.ReplyNode(addr, msg)
+				_ = c.cable.ReplyNode(addr, msg)
 			}()
 		}
 	}
-	return err
+	return nil
 }
 
 /*

@@ -3,6 +3,7 @@ package RPC
 import (
 	"RaftDB/Kernel/Pipe/Order"
 	"errors"
+	"fmt"
 	"log"
 	"math/rand"
 	"net"
@@ -30,13 +31,14 @@ import (
 */
 
 type RPC struct {
-	clientChans sync.Map
-	replyChan   chan<- Order.Order
-	delay       time.Duration
-	num         atomic.Int32
+	clientChans     sync.Map
+	replyChan       chan<- Order.Order
+	delay           time.Duration
+	num             atomic.Int32
+	alwaysConnPools map[string]sync.Pool
 }
 
-func (r *RPC) Init(replyChan interface{}) error {
+func (r *RPC) Init(replyChan interface{}, alwaysIp []string) error {
 	if x, ok := replyChan.(chan Order.Order); !ok {
 		return errors.New("RPC: Init need a reply chan")
 	} else {
@@ -47,10 +49,24 @@ func (r *RPC) Init(replyChan interface{}) error {
 	if err := rpc.RegisterName("RPC", r); err != nil {
 		return err
 	}
+	r.alwaysConnPools = map[string]sync.Pool{}
+	for _, v := range alwaysIp {
+		ip := v
+		r.alwaysConnPools[v] = sync.Pool{
+			New: func() interface{} {
+				client, err := rpc.Dial("tcp", ip)
+				if err != nil {
+					return err
+				} else {
+					return client
+				}
+			},
+		}
+	}
 	return nil
 }
 
-func (r *RPC) ReplyNode(addr string, msg interface{}) error {
+func (r *RPC) ReplyNode1(addr string, msg interface{}) error {
 	if x, ok := msg.(Order.Message); !ok {
 		return errors.New("RPC: ReplyNode need a Order.Message")
 	} else {
@@ -62,6 +78,28 @@ func (r *RPC) ReplyNode(addr string, msg interface{}) error {
 		time.Sleep(r.delay)
 		if err = client.Call("RPC.Push", x, nil); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func (r *RPC) ReplyNode(addr string, msg interface{}) error {
+	fmt.Println("---", addr)
+	if x, ok := msg.(Order.Message); !ok {
+		return errors.New("RPC: ReplyNode need a Order.Message")
+	} else {
+		if pool, has := r.alwaysConnPools[addr]; has {
+			if client, ok := pool.Get().(*rpc.Client); !ok {
+				return errors.New("lose connect")
+			} else {
+				time.Sleep(r.delay)
+				if err := client.Call("RPC.Push", x, nil); err != nil {
+					return err
+				}
+				pool.Put(client)
+			}
+		} else {
+			panic("error a new node ip")
 		}
 	}
 	return nil
