@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
-	"time"
 )
 
 var follower Follower
@@ -17,7 +16,8 @@ type Follower struct {
 }
 
 func (f *Follower) init(me *Me) error {
-	me.timer, f.voted = time.After(me.followerTimeout), -1
+	me.timer.Reset(me.followerTimeout)
+	f.voted = -1
 	return nil
 }
 
@@ -28,7 +28,7 @@ func (f *Follower) init(me *Me) error {
 */
 
 func (f *Follower) processHeartbeat(msg Order.Message, me *Me) error {
-	me.timer = time.After(me.followerTimeout)
+	me.timer.Reset(me.followerTimeout)
 	log.Printf("Follower: leader %d's heartbeat\n", msg.From)
 	if me.logSet.GetLast().Less(msg.LastLogKey) {
 		log.Println("Follower: my logSet are not complete")
@@ -84,7 +84,7 @@ func (f *Follower) processAppendLog(msg Order.Message, me *Me) error {
 		log.Printf("Follower: refuse %d's request %v, my last log is %v\n", msg.From, msg.LastLogKey, me.logSet.GetLast())
 	}
 	me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: reply}
-	me.timer = time.After(me.followerTimeout)
+	me.timer.Reset(me.followerTimeout)
 	return nil
 }
 
@@ -118,7 +118,7 @@ func (f *Follower) processCommit(msg Order.Message, me *Me) error {
 			LastLogKey:       me.logSet.GetCommitted(),
 			SecondLastLogKey: k,
 		}}
-	me.timer = time.After(me.followerTimeout)
+	me.timer.Reset(me.followerTimeout)
 	for _, v := range me.logSet.GetKsByRange(k, me.logSet.GetCommitted()) {
 		if id, has := me.syncKeyIdMap[v]; has {
 			me.syncFinishedChan <- id

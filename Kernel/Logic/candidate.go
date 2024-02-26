@@ -108,7 +108,7 @@ func (c *Candidate) processPreVoteReply(msg Order.Message, me *Me) error {
 			c.agree = map[int]bool{}
 			c.state = 1
 			log.Println("Candidate: begin vote after a random time")
-			me.timer = time.After(time.Duration(rand.Intn(100)) * time.Millisecond)
+			me.timer.Reset(time.Duration(rand.Intn(100)) * time.Millisecond)
 		}
 	}
 	return nil
@@ -159,7 +159,7 @@ func (c *Candidate) processTimeout(me *Me) error {
 	}
 	reply.Term = me.meta.Term
 	me.toBottomChan <- Order.Order{Type: Order.NodeReply, Msg: reply}
-	me.timer = time.After(me.candidatePreVoteTimeout)
+	me.timer.Reset(me.candidatePreVoteTimeout)
 	return nil
 }
 

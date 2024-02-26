@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"time"
 )
 
 /*
@@ -95,7 +94,7 @@ func (l *Leader) processAppendLogReply(msg Order.Message, me *Me) error {
 					}
 				}
 				reply.To = me.members
-				me.timer = time.After(me.leaderHeartbeat)
+				me.timer.Reset(me.leaderHeartbeat)
 				log.Printf("Leader: quorum have agreed request %v, I will commit and boardcast it\n", msg.LastLogKey)
 			}
 		}
@@ -196,7 +195,7 @@ func (l *Leader) processClientSync(msg Order.Message, me *Me) error {
 		SecondLastLogKey: secondLastKey,
 		Log:              msg.Log,
 	}}
-	me.timer = time.After(me.leaderHeartbeat)
+	me.timer.Reset(me.leaderHeartbeat)
 	l.index++
 	log.Printf("Leader: reveive a client's request whose key: %v, log: %v, now I will broadcast it\n", lastLogKey, msg.Log)
 	return nil
@@ -211,7 +210,7 @@ func (l *Leader) processTimeout(me *Me) error {
 		LastLogKey:       me.logSet.GetLast(),
 		SecondLastLogKey: me.logSet.GetSecondLast(),
 	}}
-	me.timer = time.After(me.leaderHeartbeat)
+	me.timer.Reset(me.leaderHeartbeat)
 	log.Println("Leader: timeout")
 	return nil
 }

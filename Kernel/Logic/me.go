@@ -46,7 +46,7 @@ type Me struct {
 	members                 []int                      // 维护的成员数量
 	quorum                  int                        // 最小选举人数
 	role                    Role                       // 当前角色
-	timer                   <-chan time.Time           // 计时器
+	timer                   *time.Timer                // 计时器
 	fromBottomChan          <-chan Order.Order         // 接收bottom消息的管道
 	toBottomChan            chan<- Order.Order         // 发送消息给bottom的管道
 	fromCrownChan           <-chan Something.Something // 上层接口
@@ -98,6 +98,7 @@ func (m *Me) Init(meta *Meta.Meta, logSet *Log.LogSet,
 	m.syncIdMsgMap = map[int]Order.Message{}
 	m.syncKeyIdMap = map[Log.Key]int{}
 	m.members, m.quorum = make([]int, meta.Num), meta.Num/2
+	m.timer = time.NewTimer(m.followerTimeout)
 	for i := 0; i < meta.Num; i++ {
 		m.members[i] = i
 	}
@@ -142,7 +143,7 @@ func (m *Me) Run() {
 						Msg: Order.Message{From: order.Msg.From, Log: "logic refuses to operate"}}
 				}
 			}
-		case <-m.timer:
+		case <-m.timer.C:
 			if err := m.role.processTimeout(m); err != nil {
 				log.Println(err)
 			}
